@@ -1,0 +1,6 @@
+com\stillfresh\app\userservice\service\UserService.class
+com\stillfresh\app\userservice\UserServiceApplication.class
+com\stillfresh\app\userservice\model\User.class
+com\stillfresh\app\userservice\repository\UserRepository.class
+com\stillfresh\app\userservice\config\SecurityConfig.class
+com\stillfresh\app\userservice\controller\UserController.class
