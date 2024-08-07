@@ -1,1 +1,37 @@
 "# .gitignore file" 
+# Maven target directory
+target/
+target/*
+/target
+/target/
+
+# Maven local repository
+.m2/
+
+# Eclipse IDE files
+.classpath
+.project
+.settings/
+.settings/*
+
+# Windows specific files
+Thumbs.db
+ehthumbs.db
+
+# Log files
+*.log
+
+# Temporary files
+tmp/
+*.tmp
+
+# Generated files
+*.class
+*.jar
+*.war
+*.ear
+
+# Environment variable files
+.env
+
+*.iml
