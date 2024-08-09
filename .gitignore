@@ -1,9 +1,7 @@
-"# .gitignore file" 
 # Maven target directory
 target/
-target/*
-/target
-/target/
+*/target/
+**/target/
 
 # Maven local repository
 .m2/
@@ -12,7 +10,10 @@ target/*
 .classpath
 .project
 .settings/
-.settings/*
+
+# IntelliJ IDEA files
+.idea/
+*.iml
 
 # Windows specific files
 Thumbs.db
@@ -24,6 +25,7 @@ ehthumbs.db
 # Temporary files
 tmp/
 *.tmp
+*.swp
 
 # Generated files
 *.class
@@ -34,4 +36,5 @@ tmp/
 # Environment variable files
 .env
 
-*.iml
+# OS-specific files
+.DS_Store

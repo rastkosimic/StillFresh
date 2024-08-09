@@ -1,4 +1,3 @@
-# File: user-service/src/main/resources/application.yml
 server:
   port: 8081
 
@@ -8,22 +7,17 @@ spring:
   application:
     name: user-service
   datasource:
-    url: jdbc:h2:mem:testdb
-    driverClassName: org.h2.Driver
-    username: sa
-    password:
-  h2:
-    console:
-      enabled: true
+    url: jdbc:postgresql://localhost:5432/stillfresh  # PostgreSQL database URL
+    driverClassName: org.postgresql.Driver            # PostgreSQL driver class
+    username: stillfreshuser                          # PostgreSQL username
+    password: FreshStill011                            # PostgreSQL password (ensure this is secure and managed properly)
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
-  sql:
-    init:
-      platform: h2
+      ddl-auto: update                                # Automatically updates the database schema
+    show-sql: true                                    # Shows SQL queries in the logs
+    database-platform: org.hibernate.dialect.PostgreSQLDialect  # PostgreSQL dialect for Hibernate
 
 eureka:
   client:
     serviceUrl:
-      defaultZone: http://eureka-server:8761/eureka/
+      defaultZone: http://eureka-server:8761/eureka/  # Eureka server URL
