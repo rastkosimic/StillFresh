@@ -7,7 +7,7 @@ spring:
   application:
     name: user-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/stillfresh  # PostgreSQL database URL
+    url: jdbc:postgresql://postgres:5432/stillfresh  # PostgreSQL database URL
     driverClassName: org.postgresql.Driver            # PostgreSQL driver class
     username: stillfreshuser                          # PostgreSQL username
     password: FreshStill011                            # PostgreSQL password (ensure this is secure and managed properly)
