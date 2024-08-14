@@ -3,6 +3,9 @@ package com.stillfresh.app.userservice.controller;
 
 import com.stillfresh.app.userservice.model.User;
 import com.stillfresh.app.userservice.service.UserService;
+
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,4 +28,17 @@ public class UserController {
         // Add login logic here
         return ResponseEntity.ok("User logged in successfully");
     }
+    
+    @GetMapping
+    public ResponseEntity<List<User>> getAllUsers() {
+        List<User> users = userService.findAllUsers();
+        return ResponseEntity.ok(users);
+    }
+    
+    @GetMapping("/{id}")
+    public ResponseEntity<User> getUserById(@PathVariable Long id) {
+        User user = userService.findUserById(id);
+        return ResponseEntity.ok(user);
+    }
+
 }

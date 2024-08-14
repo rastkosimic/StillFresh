@@ -37,7 +37,8 @@ public class WebSecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/authenticate").permitAll()
+                .requestMatchers("/authenticate", "/users/register").permitAll()  // Allow public access
+                .requestMatchers("/users/**").authenticated()  // Protect /users endpoints
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
@@ -46,4 +47,5 @@ public class WebSecurityConfig {
 
         return http.build();
     }
+
 }
