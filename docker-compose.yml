@@ -1,17 +1,17 @@
 version: '3.8'
 
 services:
-  postgres:
+  user-postgres:
     image: postgres:latest
     environment:
-      POSTGRES_DB: stillfresh
+      POSTGRES_DB: stillfresh_userdb
       POSTGRES_USER: stillfreshuser
-      POSTGRES_PASSWORD: FreshStill011
+      POSTGRES_PASSWORD: FreshStill011User
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - user_postgres_data:/var/lib/postgresql/data
+      - ./init-user.sql:/docker-entrypoint-initdb.d/init.sql
 
   eureka-server:
     build: ./eureka-server
@@ -23,7 +23,7 @@ services:
         max-size: "10m"
         max-file: "3"
     depends_on:
-      - postgres
+      - user-postgres
 
   api-gateway:
     build: ./api-gateway
@@ -42,13 +42,9 @@ services:
     build: ./user-service
     ports:
       - "8081:8081"
-#    environment:
-#      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5433/stillfresh
-#      SPRING_DATASOURCE_USERNAME: stillfreshuser
-#      SPRING_DATASOURCE_PASSWORD: FreshStill011
     depends_on:
       - eureka-server
-      - postgres
+      - user-postgres
     logging:
       driver: "json-file"
       options:
@@ -56,4 +52,4 @@ services:
         max-file: "3"
 
 volumes:
-  postgres_data:
+  user_postgres_data:
