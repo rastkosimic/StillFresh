@@ -38,8 +38,9 @@ public class WebSecurityConfig {
         http.csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(authz -> authz
                 .requestMatchers("/authenticate", "/users/register").permitAll()  // Allow public access
-                .requestMatchers("/users/**").authenticated()  // Protect /users endpoints
-                .anyRequest().authenticated()
+                .requestMatchers("/admin/**").hasRole("ADMIN")  // Only allow users with ADMIN role to access /admin endpoints
+                .requestMatchers("/users/**").hasAnyRole("USER", "ADMIN")  // Allow users with USER or ADMIN roles to access /users endpoints
+                .anyRequest().authenticated()  // All other requests require authentication
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
