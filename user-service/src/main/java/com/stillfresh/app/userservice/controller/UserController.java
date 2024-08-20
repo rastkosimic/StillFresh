@@ -3,6 +3,7 @@ package com.stillfresh.app.userservice.controller;
 
 import com.stillfresh.app.userservice.dto.PasswordChangeRequest;
 import com.stillfresh.app.userservice.model.User;
+import com.stillfresh.app.userservice.security.CustomUserDetails;
 import com.stillfresh.app.userservice.service.LoginAttemptService;
 import com.stillfresh.app.userservice.service.UserService;
 
@@ -66,8 +67,9 @@ public class UserController {
     
     @PutMapping("/profile")
     public ResponseEntity<User> updateUserProfile(@RequestBody User updatedUserDetails) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        User currentUser = (User) authentication.getPrincipal();
+    	CustomUserDetails customUserDetails = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    	User currentUser = customUserDetails.getUser(); // Retrieve the User object
+
 
         // Update fields directly on the currentUser
         currentUser.setUsername(updatedUserDetails.getUsername());
@@ -81,8 +83,8 @@ public class UserController {
     @PutMapping("/change-password")
     public ResponseEntity<String> changeUserPassword(@RequestBody PasswordChangeRequest passwordChangeRequest) {
         // Obtain the authenticated user's details from the security context
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        User currentUser = (User) authentication.getPrincipal(); 
+    	CustomUserDetails customUserDetails = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    	User currentUser = customUserDetails.getUser(); // Retrieve the User object
 
         // Change the password using the provided new password
         userService.changeUserPassword(currentUser, passwordChangeRequest.getNewPassword());

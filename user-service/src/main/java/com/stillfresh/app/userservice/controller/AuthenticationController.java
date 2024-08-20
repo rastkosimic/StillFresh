@@ -1,7 +1,7 @@
 package com.stillfresh.app.userservice.controller;
 
 import com.stillfresh.app.userservice.model.AuthenticationRequest;
-import com.stillfresh.app.userservice.security.CustomUserDetailsService;
+import com.stillfresh.app.userservice.service.CustomUserDetailsService;
 import com.stillfresh.app.userservice.security.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
