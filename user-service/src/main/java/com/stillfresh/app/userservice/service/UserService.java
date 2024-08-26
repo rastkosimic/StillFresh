@@ -23,9 +23,8 @@ public class UserService {
     private BCryptPasswordEncoder passwordEncoder;
 
     private static final Logger logger = LoggerFactory.getLogger(UserService.class);
-
-    public User saveUser(User user) {
-        // Check if username or email already exists
+    
+    public User registerUser(User user) {
         if (userRepository.existsByUsername(user.getUsername())) {
             throw new IllegalArgumentException("Username is already taken");
         }
@@ -37,8 +36,13 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         user.setRole(Role.USER);  // Default role
         
-        logger.info("Saving user with username: ", user.getUsername());
+        logger.info("Registering user with username: {}" + user.getUsername());
         
+        return userRepository.save(user);
+    }
+
+    public User updateUser(User user) {
+        logger.info("Updating user with username: {}" + user.getUsername());
         return userRepository.save(user);
     }
     
@@ -46,7 +50,7 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         user.setRole(Role.ADMIN);  // Assign ADMIN role
         
-        logger.info("Registering ADMIN with username: ", user.getUsername());
+        logger.info("Registering ADMIN with username: {}", user.getUsername());
         
         userRepository.save(user);
     }
@@ -56,7 +60,7 @@ public class UserService {
             .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         user.setRole(Role.ADMIN);
         
-        logger.info("ADMIN role assigned to the user with username: ", user.getUsername());
+        logger.info("ADMIN role assigned to the user with username: {}", user.getUsername());
         
         userRepository.save(user);
     }
@@ -68,8 +72,12 @@ public class UserService {
 
     public User findUserById(Long id) {
         Optional<User> user = userRepository.findById(id);
-        logger.info("Finding a user ", user.get().getUsername(),", with id: ",id);
+        logger.info("Finding a user {}", user.get().getUsername(),", with id: {}",id);
         return user.orElseThrow(() -> new RuntimeException("User not found"));
+    }
+    
+    public Optional<User> findByEmail(String email) {
+        return userRepository.findByEmail(email);
     }
     
     // Update user profile
@@ -81,7 +89,7 @@ public class UserService {
             existingUser.setEmail(updatedUser.getEmail());
             // Add any other fields that can be updated
             
-            logger.info("Updated details for the user with id: ", existingUser.getId());
+            logger.info("Updated details for the user with id: {}", existingUser.getId());
             return userRepository.save(existingUser);
         } else {
             throw new ResourceNotFoundException("User not found");
@@ -91,8 +99,13 @@ public class UserService {
     // Change user password
     public void changeUserPassword(User user, String newPassword) {
         // Encode the new password
+    	logger.info("USERNAME: {}", user.getUsername());
+    	logger.info("PASSWORD: {}", user.getPassword());
+    	logger.info("EMAIL: {}", user.getEmail());
+    	logger.info("ID: {}", user.getId());
+    	logger.info("ACTIVE: {}", user.isActive());
         user.setPassword(passwordEncoder.encode(newPassword));
-        logger.info("Password changing for the user with username: ", user.getUsername());
+        logger.info("Password changing for the user with username: {}", user.getUsername());
         // Save the updated user with the new password
         userRepository.save(user);
     }

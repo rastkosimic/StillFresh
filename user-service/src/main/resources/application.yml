@@ -17,6 +17,8 @@ spring:
     show-sql: true
     database-platform: org.hibernate.dialect.PostgreSQLDialect
 
+
+
 eureka:
   client:
     serviceUrl:

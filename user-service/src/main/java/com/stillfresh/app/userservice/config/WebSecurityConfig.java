@@ -37,9 +37,9 @@ public class WebSecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/authenticate", "/users/register").permitAll()  // Allow public access
+                .requestMatchers("/login", "/users/register", "/users/forgot-password", "/users/verify", "/users/reset-password").permitAll()  // Allow public access to these endpoints
                 .requestMatchers("/admin/**").hasRole("ADMIN")  // Only allow users with ADMIN role to access /admin endpoints
-                .requestMatchers("/users/**").hasAnyRole("USER", "ADMIN")  // Allow users with USER or ADMIN roles to access /users endpoints
+                .requestMatchers("/users/**").authenticated()  // Allow authenticated users to access /users endpoints
                 .anyRequest().authenticated()  // All other requests require authentication
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
@@ -48,5 +48,6 @@ public class WebSecurityConfig {
 
         return http.build();
     }
+
 
 }

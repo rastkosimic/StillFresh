@@ -38,3 +38,6 @@ tmp/
 
 # OS-specific files
 .DS_Store
+
+# YAML files
+.yml

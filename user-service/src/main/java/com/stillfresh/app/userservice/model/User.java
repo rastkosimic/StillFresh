@@ -40,6 +40,8 @@ public class User {
     @Enumerated(EnumType.STRING)
     private Role role;
 
+    private Boolean active = false;
+    
     public enum Role {
         USER,
         ADMIN
@@ -84,5 +86,13 @@ public class User {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+    
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(Boolean active) {
+        this.active = active;
     }
 }
