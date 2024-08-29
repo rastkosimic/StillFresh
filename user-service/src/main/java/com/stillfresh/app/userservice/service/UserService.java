@@ -104,9 +104,9 @@ public class UserService {
     	logger.info("EMAIL: {}", user.getEmail());
     	logger.info("ID: {}", user.getId());
     	logger.info("ACTIVE: {}", user.isActive());
-        user.setPassword(passwordEncoder.encode(newPassword));
-        logger.info("Password changing for the user with username: {}", user.getUsername());
-        // Save the updated user with the new password
+        String encodedPassword = passwordEncoder.encode(newPassword);
+        user.setPassword(encodedPassword);
         userRepository.save(user);
+        logger.info("Password changed for user: {}", user.getUsername());
     }
 }

@@ -7,6 +7,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
+
+import java.util.Calendar;
 import java.util.Date;
 
 @Entity
@@ -58,4 +60,5 @@ public class PasswordResetToken {
     public boolean isExpired() {
         return expiryDate.before(new Date());
     }
+    
 }

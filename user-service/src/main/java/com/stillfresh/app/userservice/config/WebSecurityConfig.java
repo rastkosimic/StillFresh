@@ -8,12 +8,9 @@ import org.springframework.security.config.annotation.authentication.configurati
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-
 import com.stillfresh.app.userservice.security.JwtRequestFilter;
 
 @Configuration
@@ -37,10 +34,10 @@ public class WebSecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/login", "/users/register", "/users/forgot-password", "/users/verify", "/users/reset-password").permitAll()  // Allow public access to these endpoints
-                .requestMatchers("/admin/**").hasRole("ADMIN")  // Only allow users with ADMIN role to access /admin endpoints
-                .requestMatchers("/users/**").authenticated()  // Allow authenticated users to access /users endpoints
-                .anyRequest().authenticated()  // All other requests require authentication
+                .requestMatchers("/auth/login", "/auth/refresh-token", "/users/register", "/users/forgot-password", "/users/verify", "/users/reset-password").permitAll()
+                .requestMatchers("/admin/**").hasRole("ADMIN")
+                .requestMatchers("/users/**", "/auth/logout").authenticated()
+                .anyRequest().authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
@@ -48,6 +45,4 @@ public class WebSecurityConfig {
 
         return http.build();
     }
-
-
 }

@@ -5,9 +5,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Component;
-
 import com.stillfresh.app.userservice.config.JwtConfig;
-
 import org.springframework.security.core.userdetails.UserDetails;
 
 import javax.crypto.SecretKey;
@@ -20,6 +18,8 @@ import java.util.function.Function;
 public class JwtUtil {
 
     private final SecretKey secretKey;
+    private final long tokenValidity = 1000 * 60 * 15; // 15 minutes
+    private final long refreshTokenValidity = 1000 * 60 * 60 * 24 * 7; // 7 days
 
     public JwtUtil(JwtConfig jwtConfig) {
         this.secretKey = Keys.hmacShaKeyFor(jwtConfig.getSecret().getBytes());
@@ -46,23 +46,29 @@ public class JwtUtil {
                 .getBody();
     }
 
-    private Boolean isTokenExpired(String token) {
+    public Boolean isTokenExpired(String token) {
         return extractExpiration(token).before(new Date());
     }
 
     public String generateToken(UserDetails userDetails) {
         CustomUserDetails customUserDetails = (CustomUserDetails) userDetails;
         Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, customUserDetails.getUsername(), customUserDetails.getUser().getRole().name());
+        return createToken(claims, customUserDetails.getUsername(), customUserDetails.getUser().getRole().name(), tokenValidity);
     }
 
-    private String createToken(Map<String, Object> claims, String subject, String role) {
+    public String generateRefreshToken(UserDetails userDetails) {
+        CustomUserDetails customUserDetails = (CustomUserDetails) userDetails;
+        Map<String, Object> claims = new HashMap<>();
+        return createToken(claims, customUserDetails.getUsername(), customUserDetails.getUser().getRole().name(), refreshTokenValidity);
+    }
+
+    private String createToken(Map<String, Object> claims, String subject, String role, long validity) {
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(subject)
-                .claim("role", role)  // Add role to the JWT token
+                .claim("role", role)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10))
+                .setExpiration(new Date(System.currentTimeMillis() + validity))
                 .signWith(secretKey, SignatureAlgorithm.HS256)
                 .compact();
     }
