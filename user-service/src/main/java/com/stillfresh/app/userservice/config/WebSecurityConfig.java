@@ -37,6 +37,7 @@ public class WebSecurityConfig {
                 .requestMatchers("/auth/login", "/auth/refresh-token", "/users/register", "/users/forgot-password", "/users/verify", "/users/reset-password").permitAll()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .requestMatchers("/users/**", "/auth/logout").authenticated()
+                .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()  // Allow access to Swagger
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));

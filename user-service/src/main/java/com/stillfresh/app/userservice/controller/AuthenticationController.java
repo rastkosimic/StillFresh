@@ -4,6 +4,8 @@ import com.stillfresh.app.userservice.model.AuthenticationRequest;
 import com.stillfresh.app.userservice.service.CustomUserDetailsService;
 import com.stillfresh.app.userservice.service.TokenBlacklistService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 
 import com.stillfresh.app.userservice.security.CustomUserDetails;
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/auth")
+@Tag(name = "Authentication", description = "Operations related to user authentication and session management")
 public class AuthenticationController {
 
 	private static final Logger logger = LoggerFactory.getLogger(AuthenticationController.class);
@@ -42,11 +45,11 @@ public class AuthenticationController {
     @Autowired
     private TokenBlacklistService tokenBlacklistService;
 
-    
     // Testing purposes
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
-    
+
+    @Operation(summary = "User Login", description = "Authenticates a user and returns a JWT token.")
     @PostMapping("/login")
     public ResponseEntity<?> createAuthenticationToken(@RequestBody AuthenticationRequest authenticationRequest) throws Exception {
         try {
@@ -56,41 +59,35 @@ public class AuthenticationController {
         } catch (BadCredentialsException e) {
             throw new Exception("Incorrect username or password", e.getCause());
         }
-        
 
-        // Load user details
         final UserDetails userDetails = userDetailsService.loadUserByUsername(authenticationRequest.getUsername());
 
-        // Testing purposes
         logger.info("COMPARING The PASSWORDS FROM LOGIN {}", passwordEncoder.matches(authenticationRequest.getPassword(), userDetails.getPassword()));
 
-        // Cast to your custom UserDetails class
         CustomUserDetails customUserDetails = (CustomUserDetails) userDetails;
 
-        // Check if the user is active
         if (!customUserDetails.getUser().isActive()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User account is not verified.");
         }
 
-        // Generate JWT token using CustomUserDetails
         final String jwt = jwtUtil.generateToken(userDetails);
 
         return ResponseEntity.ok(jwt);
     }
 
-
+    @Operation(summary = "User Logout", description = "Logs out the user by blacklisting the current JWT token.")
     @PostMapping("/logout")
     public ResponseEntity<String> logout(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String jwt = authHeader.substring(7);
-            // Add the token to a blacklist (store in a database or cache)
             tokenBlacklistService.addTokenToBlacklist(jwt);
         }
         SecurityContextHolder.clearContext();
         return ResponseEntity.ok("User logged out successfully");
     }
 
+    @Operation(summary = "Refresh Token", description = "Generates a new JWT token using a valid refresh token.")
     @PostMapping("/refresh-token")
     public ResponseEntity<?> refreshToken(@RequestBody Map<String, String> request) {
         String refreshToken = request.get("refreshToken");
@@ -105,3 +102,4 @@ public class AuthenticationController {
         return ResponseEntity.ok(newToken);
     }
 }
+

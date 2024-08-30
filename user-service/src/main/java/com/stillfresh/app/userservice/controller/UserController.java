@@ -29,9 +29,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/users")
+@Tag(name = "User Management", description = "Operations related to user management")
 public class UserController {
 	
     private static final Logger logger = LoggerFactory.getLogger(UserController.class);
@@ -54,6 +57,7 @@ public class UserController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Operation(summary = "Register a new user", description = "This endpoint registers a new user and sends a verification email.")
     @PostMapping("/register")
     public ResponseEntity<String> registerUser(@Valid @RequestBody User user) throws IOException {
         userService.registerUser(user);
@@ -72,6 +76,7 @@ public class UserController {
         return ResponseEntity.ok("User registered successfully. Please check your email for verification.");
     }
 
+    @Operation(summary = "Verify a user", description = "Verifies a user account using the token sent via email.")
     @GetMapping("/verify")
     public ResponseEntity<String> verifyUser(@RequestParam("token") String token) {
         VerificationToken verificationToken = verificationTokenRepository.findByToken(token);
@@ -87,25 +92,28 @@ public class UserController {
         return ResponseEntity.ok("Account verified successfully");
     }
 
-
+    @Operation(summary = "Admin Endpoint", description = "Access restricted to users with ADMIN role.")
     @GetMapping("/admin")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> adminEndpoint() {
         return ResponseEntity.ok("Admin content");
     }
 
+    @Operation(summary = "Get all users", description = "Retrieves a list of all registered users.")
     @GetMapping
     public ResponseEntity<List<User>> getAllUsers() {
         List<User> users = userService.findAllUsers();
         return ResponseEntity.ok(users);
     }
 
+    @Operation(summary = "Get user by ID", description = "Retrieves a user by their ID.")
     @GetMapping("/{id}")
     public ResponseEntity<User> getUserById(@PathVariable Long id) {
         User user = userService.findUserById(id);
         return ResponseEntity.ok(user);
     }
 
+    @Operation(summary = "Update user profile", description = "Allows a user to update their profile information.")
     @PutMapping("/profile")
     public ResponseEntity<User> updateUserProfile(@RequestBody User updatedUserDetails) {
         CustomUserDetails customUserDetails = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -119,6 +127,7 @@ public class UserController {
         return ResponseEntity.ok(updatedUser);
     }
 
+    @Operation(summary = "Change password", description = "Allows a user to change their password.")
     @PutMapping("/change-password")
     public ResponseEntity<String> changeUserPassword(@RequestBody PasswordChangeRequest passwordChangeRequest) {
         CustomUserDetails customUserDetails = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -128,7 +137,8 @@ public class UserController {
 
         return ResponseEntity.ok("Password changed successfully");
     }
-    
+
+    @Operation(summary = "Forgot password", description = "Initiates the password reset process by sending a reset link to the user's email.")
     @Transactional
     @PostMapping("/forgot-password")
     public ResponseEntity<String> forgotPassword(@RequestParam String email) throws IOException {
@@ -168,6 +178,7 @@ public class UserController {
         return new Date(now.getTime() + (EXPIRATION_TIME_IN_MINUTES * 60 * 1000));
     }
 
+    @Operation(summary = "Reset password", description = "Allows a user to reset their password using a valid token.")
     @PostMapping("/reset-password")
     public ResponseEntity<String> resetPassword(@RequestParam("token") String token, @RequestBody String newPassword) {
     	logger.info("Received token: {}", token);
@@ -179,9 +190,6 @@ public class UserController {
         }
 
         User user = resetToken.getUser();
-//        user.setPassword(passwordEncoder.encode(newPassword));
-//        userService.updateUser(user);
-        
         userService.changeUserPassword(user, newPassword);
 
         return ResponseEntity.ok("Password reset successfully");
