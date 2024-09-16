@@ -18,13 +18,21 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Autowired
     private UserRepository userRepository;
     
+
+    @Autowired
+    private UserService userService;
+
     private static final Logger logger = LoggerFactory.getLogger(UserService.class);
 
     @Override
+//    @Cacheable(value = "users", key = "#username")
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-    	logger.info("loading the user with username: ", username);
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + username));
+        User user = userService.findUserByUsername(username);
         return new CustomUserDetails(user);
+    }
+
+//    @CacheEvict(value = "users", key = "#user.username")
+    public void evictUserCache(User user) {
+        logger.info("Evicting cache for user: {}", user.getUsername());
     }
 }

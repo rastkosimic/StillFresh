@@ -13,6 +13,16 @@ services:
       - user_postgres_data:/var/lib/postgresql/data
       - ./init-user.sql:/docker-entrypoint-initdb.d/init.sql
 
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   eureka-server:
     build: ./eureka-server
     ports:
@@ -45,6 +55,7 @@ services:
     depends_on:
       - eureka-server
       - user-postgres
+      - redis
     logging:
       driver: "json-file"
       options:

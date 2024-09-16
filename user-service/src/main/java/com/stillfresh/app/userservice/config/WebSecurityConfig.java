@@ -3,6 +3,7 @@ package com.stillfresh.app.userservice.config;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -18,6 +19,7 @@ import com.stillfresh.app.userservice.security.JwtRequestFilter;
 public class WebSecurityConfig {
 
     @Autowired
+    @Lazy
     private JwtRequestFilter jwtRequestFilter;
 
     @Bean
