@@ -1,16 +1,16 @@
 server:
-  port: 8081
+  port: 8083  # Port for vendor-service
 
 spring:
   main:
     allow-bean-definition-overriding: true
   application:
-    name: user-service
+    name: vendor-service
   datasource:
-    url: jdbc:postgresql://user-postgres:5432/stillfresh_userdb
+    url: jdbc:postgresql://vendor-postgres:5432/stillfresh_vendordb  # Adjusted for vendor database
     driverClassName: org.postgresql.Driver
-    username: stillfreshuser
-    password: FreshStill011User
+    username: stillfreshvendor
+    password: FreshStill011Vendor  # Adjust this to your actual vendor DB password
   jpa:
     hibernate:
       ddl-auto: update
@@ -41,13 +41,10 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
-sendgrid:
-  api-key: SG.NoG7CrdZS02S6BuqGFezVA.oRukFPu_ZK3i43NgnrLCwoGoNjoSiUqACK7iRPaiUIU
-
 eureka:
   client:
     serviceUrl:
-      defaultZone: http://eureka-server:8761/eureka
+      defaultZone: http://eureka-server:8761/eureka  # Same Eureka server
 
 jwt:
-  secret: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtYWtzaW1zaW1pYyIsImlhdCI6MTcyNDA4MzYxOSwiZXhwIjoxNzI0MTE5NjE5fQ.EMRkIGz1oESq7TtMSoMXsb13OaDtct1L6Qcc-0CY-pY
+  secret: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtYWtzaW1zaW1pYyIsImlhdCI6MTcyNDA4MzYxOSwiZXhwIjoxNzI0MTE5NjE5fQ.EMRkIGz1oESq7TtMSoMXsb13OaDtct1L6Qcc-0CY-pY  # Same JWT secret key

@@ -35,5 +35,6 @@
         <module>api-gateway</module>
         <module>user-service</module>
         <module>eureka-server</module>
+        <module>vendor-service</module>
     </modules>
 </project>
