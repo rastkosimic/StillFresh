@@ -41,8 +41,6 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
-sendgrid:
-  api-key: SG.NoG7CrdZS02S6BuqGFezVA.oRukFPu_ZK3i43NgnrLCwoGoNjoSiUqACK7iRPaiUIU
 
 eureka:
   client:
