@@ -1,12 +1,23 @@
 package com.stillfresh.app.vendorservice.service;
 
+import com.stillfresh.app.vendorservice.model.PasswordResetToken;
+import com.stillfresh.app.vendorservice.model.Vendor;
+import com.stillfresh.app.vendorservice.model.Vendor.Role;
+import com.stillfresh.app.vendorservice.model.VendorVerificationToken;
+import com.stillfresh.app.vendorservice.repository.PasswordResetTokenRepository;
+import com.stillfresh.app.vendorservice.repository.VendorRepository;
+import com.stillfresh.app.vendorservice.repository.VendorVerificationTokenRepository;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import com.stillfresh.app.vendorservice.model.Vendor;
-import com.stillfresh.app.vendorservice.model.Vendor.Role;
-import com.stillfresh.app.vendorservice.repository.VendorRepository;
+import java.io.IOException;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.Date;
 
 @Service
 public class VendorService {
@@ -15,47 +26,93 @@ public class VendorService {
     private VendorRepository vendorRepository;
 
     @Autowired
+    private VendorVerificationTokenRepository vendorVerificationTokenRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
-    public Vendor registerVendor(Vendor vendor) {
+    @Autowired
+    private EmailService emailService;
+
+    @Autowired
+    private PasswordResetTokenRepository passwordResetTokenRepository;
+
+    private static final Logger logger = LoggerFactory.getLogger(VendorService.class);
+
+    public Vendor registerVendor(Vendor vendor) throws IOException {
         if (vendorRepository.existsByEmail(vendor.getEmail())) {
             throw new RuntimeException("Vendor already registered with this email");
         }
         vendor.setPassword(passwordEncoder.encode(vendor.getPassword()));
-        vendor.setActive(true);  // Activate by default
-        vendor.setRole(Role.VENDOR);  // Assign VENDOR role by default
-        return vendorRepository.save(vendor);
-    }
+        vendor.setRole(Role.VENDOR);
+        vendor.setActive(false);  // Inactive until verified
+        vendorRepository.save(vendor);
 
-    public Vendor registerAdmin(Vendor vendor) {
-        if (vendorRepository.existsByEmail(vendor.getEmail())) {
-            throw new RuntimeException("Vendor already registered with this email");
-        }
-        vendor.setPassword(passwordEncoder.encode(vendor.getPassword()));
-        vendor.setActive(true);
-        vendor.setRole(Role.ADMIN);  // Assign ADMIN role
-        return vendorRepository.save(vendor);
-    }
+        // Generate verification token
+        String token = UUID.randomUUID().toString();
+        VendorVerificationToken verificationToken = new VendorVerificationToken();
+        verificationToken.setToken(token);
+        verificationToken.setVendor(vendor);
+        vendorVerificationTokenRepository.save(verificationToken);
 
-    public Vendor authenticateVendor(String email, String password) {
-        Vendor vendor = vendorRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Vendor not found"));
-        if (!passwordEncoder.matches(password, vendor.getPassword())) {
-            throw new RuntimeException("Invalid credentials");
-        }
+        // Send verification email
+        
+        String verificationUrl = "http://localhost:8083/vendors/verify?token=" + token;
+        emailService.sendVerificationEmail(vendor.getEmail(), verificationUrl);
+
         return vendor;
     }
 
-    public Vendor getVendorById(Long id) {
-        return vendorRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Vendor not found"));
+    public boolean verifyVendor(String token) {
+        VendorVerificationToken verificationToken = vendorVerificationTokenRepository.findByToken(token)
+                .orElseThrow(() -> new RuntimeException("Invalid token"));
+        Vendor vendor = verificationToken.getVendor();
+        vendor.setActive(true);
+        vendorRepository.save(vendor);
+        return true;
+    }
+    
+    public void sendPasswordResetLink(String email) throws IOException {
+        Vendor vendor = vendorRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Vendor not found with email: " + email));
+
+        // Check if a token already exists for this vendor and remove it
+        Optional<PasswordResetToken> existingToken = passwordResetTokenRepository.findByVendor(vendor);
+        existingToken.ifPresent(token -> passwordResetTokenRepository.delete(token));
+
+        // Generate a new reset token
+        String token = UUID.randomUUID().toString();
+        PasswordResetToken resetToken = new PasswordResetToken();
+        resetToken.setToken(token);
+        resetToken.setVendor(vendor);
+        resetToken.setExpiryDate(calculateExpiryDate(24)); // Token valid for 24 hours
+        passwordResetTokenRepository.save(resetToken);
+
+        // Send the reset email
+        emailService.sendPasswordResetEmail(vendor.getEmail(), token);
     }
 
-    public void updateVendorProfile(Long id, Vendor updatedVendor) {
-        Vendor existingVendor = getVendorById(id);
-        existingVendor.setName(updatedVendor.getName());
-        existingVendor.setAddress(updatedVendor.getAddress());
-        existingVendor.setPhone(updatedVendor.getPhone());
-        vendorRepository.save(existingVendor);
+    public void resetPassword(String token, String newPassword) {
+        PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
+                .orElseThrow(() -> new RuntimeException("Invalid or expired password reset token"));
+
+        Vendor vendor = resetToken.getVendor();
+        logger.info("Old Password Hash: " + vendor.getPassword());
+        
+        // Hash the new password
+        String encodedPassword = passwordEncoder.encode(newPassword);
+        vendor.setPassword(encodedPassword);
+
+        logger.info("New Password Hash: " + encodedPassword);
+        vendorRepository.save(vendor);
+
+        // Remove the reset token after successful password reset
+        passwordResetTokenRepository.delete(resetToken);
+    }
+
+
+    private Date calculateExpiryDate(int hours) {
+        Date now = new Date();
+        return new Date(now.getTime() + (hours * 60 * 60 * 1000));  // Expiry time in milliseconds
     }
 }

@@ -36,7 +36,7 @@ public class WebSecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/auth/login", "/vendors/register").permitAll()
+                .requestMatchers("/auth/login", "/vendors/register", "/vendors/verify", "/vendors/forgot-password", "/vendors/reset-password").permitAll()
                 .requestMatchers("/admin/**").hasRole("ADMIN")  // Admin-specific routes
                 .requestMatchers("/vendors/**").hasRole("VENDOR")  // Vendor-specific routes
                 .anyRequest().authenticated()

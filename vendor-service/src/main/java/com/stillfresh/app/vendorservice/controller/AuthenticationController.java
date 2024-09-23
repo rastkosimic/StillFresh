@@ -26,17 +26,18 @@ public class AuthenticationController {
     @PostMapping("/login")
     public ResponseEntity<String> login(@RequestBody AuthenticationRequest authenticationRequest) throws Exception {
         try {
+            // Use email instead of username for authentication
             authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(authenticationRequest.getUsername(), authenticationRequest.getPassword())
+                    new UsernamePasswordAuthenticationToken(authenticationRequest.getEmail(), authenticationRequest.getPassword())
             );
         } catch (Exception e) {
-            throw new Exception("Incorrect username or password", e);
+            throw new Exception("Incorrect email or password", e);
         }
 
-        final UserDetails vendorDetails = vendorDetailsService.loadUserByUsername(authenticationRequest.getUsername());
+        // Use email for vendor lookup
+        final UserDetails vendorDetails = vendorDetailsService.loadUserByUsername(authenticationRequest.getEmail());
         final String jwt = jwtUtil.generateToken(vendorDetails);
 
         return ResponseEntity.ok(jwt);
     }
 }
-

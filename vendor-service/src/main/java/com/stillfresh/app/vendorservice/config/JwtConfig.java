@@ -26,4 +26,3 @@ public class JwtConfig {
         this.expirationTime = expirationTime;
     }
 }
-
