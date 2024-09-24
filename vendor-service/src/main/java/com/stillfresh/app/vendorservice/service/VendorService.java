@@ -109,6 +109,12 @@ public class VendorService {
         // Remove the reset token after successful password reset
         passwordResetTokenRepository.delete(resetToken);
     }
+    
+    public Vendor findVendorById(Long id) {
+        Optional<Vendor> user = vendorRepository.findById(id);
+        logger.info("Finding a user {}, with id: {}", user.map(Vendor::getName).orElse("Not found"), id);
+        return user.orElseThrow(() -> new RuntimeException("User not found"));
+    }
 
 
     private Date calculateExpiryDate(int hours) {

@@ -26,13 +26,28 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
 //    @Cacheable(value = "users", key = "#username")
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userService.findUserByUsername(username);
+    public UserDetails loadUserByUsername(String identifier) throws UsernameNotFoundException {
+        User user;
+
+        if (isEmail(identifier)) {
+            user = userRepository.findByEmail(identifier)
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + identifier));
+        } else {
+            user = userRepository.findByUsername(identifier)
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + identifier));
+        }
+
+        logger.info("Loaded Vendor Password Hash: " + user.getPassword());
         return new CustomUserDetails(user);
     }
 
 //    @CacheEvict(value = "users", key = "#user.username")
     public void evictUserCache(User user) {
         logger.info("Evicting cache for user: {}", user.getUsername());
+    }
+    
+    private boolean isEmail(String identifier) {
+        // Basic regex to check if the identifier is an email
+        return identifier.contains("@");
     }
 }

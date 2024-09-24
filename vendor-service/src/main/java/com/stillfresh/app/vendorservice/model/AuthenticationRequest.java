@@ -1,15 +1,16 @@
 package com.stillfresh.app.vendorservice.model;
 
 public class AuthenticationRequest {
-    private String email;
+    private String identifier; // This will be used for both email or name
     private String password;
 
-    public String getEmail() {
-        return email;
+    // Getters and setters
+    public String getIdentifier() {
+        return identifier;
     }
 
-    public void setEmail(String email) {
-        this.email = email;
+    public void setIdentifier(String identifier) {
+        this.identifier = identifier;
     }
 
     public String getPassword() {
@@ -20,3 +21,4 @@ public class AuthenticationRequest {
         this.password = password;
     }
 }
+

@@ -21,12 +21,55 @@ public class CustomVendorDetailsService implements UserDetailsService {
     private static final Logger logger = LoggerFactory.getLogger(CustomVendorDetailsService.class);
     
     @Override
-    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+    public UserDetails loadUserByUsername(String identifier) throws UsernameNotFoundException {
+        Vendor vendor;
+
+        if (isEmail(identifier)) {
+            vendor = vendorRepository.findByEmail(identifier)
+                    .orElseThrow(() -> new UsernameNotFoundException("Vendor not found with email: " + identifier));
+        } else {
+            vendor = vendorRepository.findByName(identifier)
+                    .orElseThrow(() -> new UsernameNotFoundException("Vendor not found with name: " + identifier));
+        }
+
+        logger.info("Loaded Vendor Password Hash: " + vendor.getPassword());
+        return new CustomVendorDetails(vendor);
+    }
+//    public UserDetails loadUserByUsername(String name) throws UsernameNotFoundException {
+//        Vendor vendor = vendorRepository.findByName(name)
+//                .orElseThrow(() -> new UsernameNotFoundException("Vendor not found with name: " + name));
+//
+//        logger.info("Loaded Vendor Password Hash: " + vendor.getPassword());
+//        return new CustomVendorDetails(vendor);
+//    }
+    
+    public UserDetails loadUserByEmail(String email) throws UsernameNotFoundException {
         Vendor vendor = vendorRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("Vendor not found with email: " + email));
 
         logger.info("Loaded Vendor Password Hash: " + vendor.getPassword());
         return new CustomVendorDetails(vendor);
+    }
+    
+
+    public UserDetails loadUserByEmailOrName(String identifier) throws UsernameNotFoundException {
+        Vendor vendor;
+
+        if (isEmail(identifier)) {
+            vendor = vendorRepository.findByEmail(identifier)
+                    .orElseThrow(() -> new UsernameNotFoundException("Vendor not found with email: " + identifier));
+        } else {
+            vendor = vendorRepository.findByName(identifier)
+                    .orElseThrow(() -> new UsernameNotFoundException("Vendor not found with name: " + identifier));
+        }
+
+        logger.info("Loaded Vendor Password Hash: " + vendor.getPassword());
+        return new CustomVendorDetails(vendor);
+    }
+
+    private boolean isEmail(String identifier) {
+        // Basic regex to check if the identifier is an email
+        return identifier.contains("@");
     }
 
 }

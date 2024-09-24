@@ -1,20 +1,23 @@
 package com.stillfresh.app.userservice.model;
 
 public class AuthenticationRequest {
-    private String username;
+    private String identifier; // This will be used for both email or name
     private String password;
-    
-	public String getUsername() {
-		return username;
-	}
-	public void setUsername(String username) {
-		this.username = username;
-	}
-	public String getPassword() {
-		return password;
-	}
-	public void setPassword(String password) {
-		this.password = password;
-	}
 
+    // Getters and setters
+    public String getIdentifier() {
+        return identifier;
+    }
+
+    public void setIdentifier(String identifier) {
+        this.identifier = identifier;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
 }

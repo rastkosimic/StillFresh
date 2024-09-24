@@ -49,18 +49,18 @@ public class AuthenticationController {
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
 
-    @Operation(summary = "User Login", description = "Authenticates a user and returns a JWT token.")
+    @Operation(summary = "User Login", description = "Authenticates a user and returns a JWT token. Username or email and password are used for logging in.")
     @PostMapping("/login")
     public ResponseEntity<?> createAuthenticationToken(@RequestBody AuthenticationRequest authenticationRequest) throws Exception {
         try {
             authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(authenticationRequest.getUsername(), authenticationRequest.getPassword())
+                new UsernamePasswordAuthenticationToken(authenticationRequest.getIdentifier(), authenticationRequest.getPassword())
             );
         } catch (BadCredentialsException e) {
             throw new Exception("Incorrect username or password", e.getCause());
         }
 
-        final UserDetails userDetails = userDetailsService.loadUserByUsername(authenticationRequest.getUsername());
+        final UserDetails userDetails = userDetailsService.loadUserByUsername(authenticationRequest.getIdentifier());
 
         logger.info("COMPARING The PASSWORDS FROM LOGIN {}", passwordEncoder.matches(authenticationRequest.getPassword(), userDetails.getPassword()));
 
@@ -98,7 +98,7 @@ public class AuthenticationController {
         String username = jwtUtil.extractUsername(refreshToken);
         UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-        String newToken = jwtUtil.generateToken(userDetails);
+        String newToken = jwtUtil.generateRefreshToken(userDetails);
         return ResponseEntity.ok(newToken);
     }
 }

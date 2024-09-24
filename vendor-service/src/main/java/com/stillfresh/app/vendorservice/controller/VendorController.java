@@ -42,4 +42,10 @@ public class VendorController {
         vendorService.resetPassword(token, newPassword);
         return ResponseEntity.ok("Password reset successfully");
     }
+    
+    @GetMapping("/{id}")
+    public ResponseEntity<Vendor> getVendorById(@PathVariable Long id) {
+    	Vendor user = vendorService.findVendorById(id);
+        return ResponseEntity.ok(user);
+    }
 }
