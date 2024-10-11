@@ -77,14 +77,14 @@ public class AuthenticationController {
 
     @Operation(summary = "User Logout", description = "Logs out the user by blacklisting the current JWT token.")
     @PostMapping("/logout")
-    public ResponseEntity<String> logout(HttpServletRequest request) {
-        String authHeader = request.getHeader("Authorization");
+    public ResponseEntity<String> logout(@RequestHeader("Authorization") String authHeader) {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String jwt = authHeader.substring(7);
-            tokenBlacklistService.addTokenToBlacklist(jwt);
+            long expiryDurationInMillis = jwtUtil.getExpirationTimeInMillis(jwt) - System.currentTimeMillis();
+            tokenBlacklistService.addTokenToBlacklist(jwt, expiryDurationInMillis);
         }
         SecurityContextHolder.clearContext();
-        return ResponseEntity.ok("User logged out successfully");
+        return ResponseEntity.ok("Logged out successfully");
     }
 
     @Operation(summary = "Refresh Token", description = "Generates a new JWT token using a valid refresh token.")

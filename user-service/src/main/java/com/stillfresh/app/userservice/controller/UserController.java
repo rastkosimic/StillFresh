@@ -12,6 +12,7 @@ import com.stillfresh.app.userservice.service.UserService;
 import com.stillfresh.app.userservice.repository.PasswordResetTokenRepository;
 import com.stillfresh.app.userservice.repository.VerificationTokenRepository;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 import java.io.IOException;
@@ -23,11 +24,13 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -129,13 +132,29 @@ public class UserController {
 
     @Operation(summary = "Change password", description = "Allows a user to change their password.")
     @PutMapping("/change-password")
-    public ResponseEntity<String> changeUserPassword(@RequestBody PasswordChangeRequest passwordChangeRequest) {
-        CustomUserDetails customUserDetails = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        User currentUser = customUserDetails.getUser();
+    public ResponseEntity<String> changeUserPassword(
+        @Valid @RequestBody PasswordChangeRequest passwordChangeRequest, HttpServletRequest request, BindingResult result) {
 
-        userService.changeUserPassword(currentUser, passwordChangeRequest.getNewPassword());
+        if (result.hasErrors()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                                 .body(result.getAllErrors().get(0).getDefaultMessage());
+        }
 
-        return ResponseEntity.ok("Password changed successfully");
+        CustomUserDetails userDetails = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        User currentUser = userDetails.getUser();
+
+        ResponseEntity<String> passwordChangeResponse = userService.changeUserPassword(currentUser, passwordChangeRequest);
+        
+        // If password change was successful, invalidate the token and log out
+        if (passwordChangeResponse.getStatusCode().is2xxSuccessful()) {
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                String jwt = authHeader.substring(7);
+                userService.logoutAndInvalidateToken(jwt);
+            }
+        }
+
+        return passwordChangeResponse;
     }
 
     @Operation(summary = "Forgot password", description = "Initiates the password reset process by sending a reset link to the user's email.")

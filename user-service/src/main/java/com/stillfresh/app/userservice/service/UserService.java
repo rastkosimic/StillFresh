@@ -1,9 +1,11 @@
 package com.stillfresh.app.userservice.service;
 
+import com.stillfresh.app.userservice.dto.PasswordChangeRequest;
 import com.stillfresh.app.userservice.exception.ResourceNotFoundException;
 import com.stillfresh.app.userservice.model.User;
 import com.stillfresh.app.userservice.model.User.Role;
 import com.stillfresh.app.userservice.repository.UserRepository;
+import com.stillfresh.app.userservice.security.JwtUtil;
 
 import java.util.List;
 import java.util.Optional;
@@ -15,6 +17,9 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -28,6 +33,12 @@ public class UserService {
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
 
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    @Autowired
+    private TokenBlacklistService tokenBlacklistService;
+    
     private static final Logger logger = LoggerFactory.getLogger(UserService.class);
     
     @Caching(evict = {
@@ -130,5 +141,24 @@ public class UserService {
         user.setPassword(encodedPassword);
         userRepository.save(user);
         logger.info("Password changed for user: {}", user.getUsername());
+    }
+    
+    public ResponseEntity<String> changeUserPassword(User user, PasswordChangeRequest passwordChangeRequest) {
+        if (!passwordEncoder.matches(passwordChangeRequest.getOldPassword(), user.getPassword())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Old password is incorrect");
+        }
+
+        String encodedPassword = passwordEncoder.encode(passwordChangeRequest.getNewPassword());
+        user.setPassword(encodedPassword);
+        userRepository.save(user);
+
+        return ResponseEntity.ok("Password changed successfully");
+    }
+
+    public void logoutAndInvalidateToken(String jwt) {
+        long expiryDurationInMillis = jwtUtil.getExpirationTimeInMillis(jwt) - System.currentTimeMillis();
+        tokenBlacklistService.addTokenToBlacklist(jwt, expiryDurationInMillis);
+
+        SecurityContextHolder.clearContext();
     }
 }

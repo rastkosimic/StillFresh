@@ -1,11 +1,16 @@
 package com.stillfresh.app.vendorservice.model;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToOne;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 @Entity
 public class Vendor {
@@ -13,19 +18,33 @@ public class Vendor {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
+    
+    @NotBlank(message = "Name cannot be blank")
     private String name;
+
+    @Email(message = "Email should be valid")
+    @NotBlank(message = "Email cannot be blank")
     private String email;
+
+    @NotBlank(message = "Address cannot be blank")
     private String address;
+
+    @NotBlank(message = "Phone number cannot be blank")
     private String phone;
-    private String password;  // Hashed password for authentication
+
+    @Size(min = 6, message = "Password must be at least 6 characters long")
+    private String password;
 
     private boolean active;
     
     @Enumerated(EnumType.STRING)
     private Role role;  // Role field
     
+    @OneToOne(mappedBy = "vendor", cascade = CascadeType.ALL, orphanRemoval = true)
+    private VendorVerificationToken vendorVerificationToken;
+    
     public enum Role {
+        SUPER_ADMIN, // Super-Admin with more privileges
         ADMIN,  // Admin vendor
         VENDOR  // Regular vendor
     }
