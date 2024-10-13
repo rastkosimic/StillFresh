@@ -36,5 +36,6 @@
         <module>user-service</module>
         <module>eureka-server</module>
         <module>vendor-service</module>
+        <module>authorization-service</module>
     </modules>
 </project>
