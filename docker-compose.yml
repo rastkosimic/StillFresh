@@ -27,7 +27,20 @@ services:
       - vendor_postgres_data:/var/lib/postgresql/data
       - ./init-vendor.sql:/docker-entrypoint-initdb.d/init.sql 
 
-  # Redis for caching
+  # PostgreSQL for authorization-service
+  auth-postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: stillfresh_authdb
+      POSTGRES_USER: stillfreshauth
+      POSTGRES_PASSWORD: FreshStill011Auth
+    ports:
+      - "5434:5432"
+    volumes:
+      - auth_postgres_data:/var/lib/postgresql/data
+      - ./init-auth.sql:/docker-entrypoint-initdb.d/init.sql 
+
+  # Redis for caching and token blacklisting
   redis:
     image: redis:latest
     ports:
@@ -51,6 +64,7 @@ services:
     depends_on:
       - user-postgres
       - vendor-postgres
+      - auth-postgres
 
   # API Gateway
   api-gateway:
@@ -59,6 +73,7 @@ services:
       - "8080:8080"
     depends_on:
       - eureka-server
+      - authorization-service
       - user-service
       - vendor-service  # Added vendor-service dependency
     logging:
@@ -89,7 +104,22 @@ services:
       - "8083:8083"
     depends_on:
       - eureka-server
-      - vendor-postgres  # Vendor service depends on vendor-postgres for DB
+      - vendor-postgres
+      - redis
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Authorization Service
+  authorization-service:
+    build: ./authorization-service
+    ports:
+      - "8082:8082"
+    depends_on:
+      - eureka-server
+      - auth-postgres
       - redis
     logging:
       driver: "json-file"
@@ -100,3 +130,4 @@ services:
 volumes:
   user_postgres_data:
   vendor_postgres_data:
+  auth_postgres_data:

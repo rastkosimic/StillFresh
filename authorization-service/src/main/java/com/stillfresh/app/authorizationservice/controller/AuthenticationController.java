@@ -1,0 +1,87 @@
+package com.stillfresh.app.authorizationservice.controller;
+
+import com.stillfresh.app.authorizationservice.model.AuthenticationRequest;
+import com.stillfresh.app.authorizationservice.security.CustomUserDetails;
+import com.stillfresh.app.authorizationservice.security.JwtUtil;
+import com.stillfresh.app.authorizationservice.service.CustomUserDetailsService;
+import com.stillfresh.app.authorizationservice.service.TokenBlacklistService;
+
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/auth")
+public class AuthenticationController {
+
+    @Autowired
+    private TokenBlacklistService tokenBlacklistService;
+
+    @Autowired
+    private AuthenticationManager authenticationManager;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    @Autowired
+    private CustomUserDetailsService userDetailsService;
+
+    @PostMapping("/login")
+    public ResponseEntity<String> login(@RequestBody AuthenticationRequest authenticationRequest) throws Exception {
+        String identifier = authenticationRequest.getIdentifier();  // Either email or username
+        String password = authenticationRequest.getPassword();
+
+        try {
+            // Authenticate using the identifier and password
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(identifier, password)
+            );
+        } catch (Exception e) {
+            throw new Exception("Incorrect identifier or password", e);
+        }
+
+        // Load user by identifier (username or email)
+        UserDetails userDetails = userDetailsService.loadUserByUsername(identifier);
+        CustomUserDetails customUserDetails = (CustomUserDetails) userDetails;
+
+        if (!customUserDetails.getUser().isActive()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User account is not verified.");
+        }
+
+        // Generate JWT token
+        final String jwt = jwtUtil.generateToken(userDetails);
+        return ResponseEntity.ok(jwt);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<String> logout(@RequestHeader("Authorization") String authHeader) {
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String jwt = authHeader.substring(7);
+            long expiryDurationInMillis = jwtUtil.getExpirationTimeInMillis(jwt) - System.currentTimeMillis();
+            tokenBlacklistService.addTokenToBlacklist(jwt, expiryDurationInMillis);
+        }
+        SecurityContextHolder.clearContext();
+        return ResponseEntity.ok("Logged out successfully");
+    }
+
+    @PostMapping("/refresh-token")
+    public ResponseEntity<?> refreshToken(@RequestBody Map<String, String> request) {
+        String refreshToken = request.get("refreshToken");
+        if (refreshToken == null || jwtUtil.isTokenExpired(refreshToken)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired refresh token");
+        }
+
+        String username = jwtUtil.extractUsername(refreshToken);
+        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+        String newToken = jwtUtil.generateRefreshToken(userDetails);
+        return ResponseEntity.ok(newToken);
+    }
+}

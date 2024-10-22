@@ -110,6 +110,15 @@
 			<groupId>io.lettuce</groupId>
 			<artifactId>lettuce-core</artifactId>
 		</dependency>
+		
+		    <!-- Shared Entities Module -->
+	    <dependency>
+	        <groupId>com.app</groupId>
+	        <artifactId>shared-entities</artifactId>
+	        <version>0.0.1-SNAPSHOT</version>
+	    </dependency>
+		
+		
 	</dependencies>
 	<build>
 		<plugins>

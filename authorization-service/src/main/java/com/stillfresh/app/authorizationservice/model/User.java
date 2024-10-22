@@ -1,4 +1,4 @@
-package com.stillfresh.app.userservice.model;
+package com.stillfresh.app.authorizationservice.model;
 
 import com.stillfresh.app.sharedentities.enums.Role;
 import com.stillfresh.app.sharedentities.interfaces.Account;
@@ -25,6 +25,7 @@ import jakarta.validation.constraints.Size;
     @Index(name = "idx_user_email", columnList = "email")
 })
 public class User implements Account{
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -85,7 +86,7 @@ public class User implements Account{
     public void setRole(Role role) {
         this.role = role;
     }
-    
+
     public boolean isActive() {
         return active;
     }

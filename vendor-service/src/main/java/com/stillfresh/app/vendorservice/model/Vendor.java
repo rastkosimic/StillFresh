@@ -1,5 +1,8 @@
 package com.stillfresh.app.vendorservice.model;
 
+import com.stillfresh.app.sharedentities.enums.Role;
+import com.stillfresh.app.sharedentities.interfaces.Account;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -13,7 +16,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 @Entity
-public class Vendor {
+public class Vendor implements Account{
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -43,11 +46,6 @@ public class Vendor {
     @OneToOne(mappedBy = "vendor", cascade = CascadeType.ALL, orphanRemoval = true)
     private VendorVerificationToken vendorVerificationToken;
     
-    public enum Role {
-        SUPER_ADMIN, // Super-Admin with more privileges
-        ADMIN,  // Admin vendor
-        VENDOR  // Regular vendor
-    }
 
 	public Long getId() {
 		return id;
