@@ -2,19 +2,29 @@ package com.stillfresh.app.authorizationservice.service;
 
 import com.stillfresh.app.authorizationservice.model.PasswordResetToken;
 import com.stillfresh.app.authorizationservice.model.User;
-import com.stillfresh.app.authorizationservice.model.User.Role;
 import com.stillfresh.app.authorizationservice.model.UserVerificationToken;
+import com.stillfresh.app.authorizationservice.publisher.AuthorizationEventPublisher;
 import com.stillfresh.app.authorizationservice.repository.PasswordResetTokenRepository;
 import com.stillfresh.app.authorizationservice.repository.UserRepository;
 import com.stillfresh.app.authorizationservice.repository.UserVerificationTokenRepository;
 import com.stillfresh.app.authorizationservice.security.JwtUtil;
-import com.stillfresh.app.authorizationservice.service.EmailService;
+import com.stillfresh.app.sharedentities.dto.CheckAvailabilityRequest;
+import com.stillfresh.app.sharedentities.enums.Role;
+import com.stillfresh.app.sharedentities.enums.Status;
+import com.stillfresh.app.sharedentities.shared.events.TokenRequestEvent;
+import com.stillfresh.app.sharedentities.shared.events.TokenValidationResponseEvent;
+import com.stillfresh.app.sharedentities.user.events.LoggedUserEvent;
+import com.stillfresh.app.sharedentities.user.events.UpdateUserProfileEvent;
+import com.stillfresh.app.sharedentities.user.events.UserRegisteredEvent;
+import com.stillfresh.app.sharedentities.user.events.UserVerifiedEvent;
+import com.stillfresh.app.sharedentities.vendor.events.LoggedVendorEvent;
+import com.stillfresh.app.sharedentities.vendor.events.UpdateVendorProfileEvent;
+import com.stillfresh.app.sharedentities.vendor.events.VendorRegisteredEvent;
+import com.stillfresh.app.sharedentities.vendor.events.VendorVerifiedEvent;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -48,6 +58,9 @@ public class UserService {
 
     @Autowired
     private JwtUtil jwtUtil;
+    
+    @Autowired
+    private AuthorizationEventPublisher authorizationEventPublisher;
 
     private static final Logger logger = LoggerFactory.getLogger(UserService.class);
 
@@ -63,7 +76,7 @@ public class UserService {
         }
         admin.setPassword(passwordEncoder.encode(admin.getPassword()));
         admin.setRole(Role.SUPER_ADMIN);
-        admin.setActive(true);
+        admin.setStatus(Status.ACTIVE);
         return userRepository.save(admin);
     }
 
@@ -74,7 +87,7 @@ public class UserService {
         }
         admin.setPassword(passwordEncoder.encode(admin.getPassword()));
         admin.setRole(Role.ADMIN);
-        admin.setActive(true);  // Admin is active by default
+        admin.setStatus(Status.ACTIVE);  // Admin is active by default
         return userRepository.save(admin);
     }
 
@@ -85,7 +98,7 @@ public class UserService {
         }
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         user.setRole(Role.USER);
-        user.setActive(false);  // Inactive until verified
+        user.setStatus(Status.INACTIVE);  // Inactive until verified
         userRepository.save(user);
 
         // Generate verification token
@@ -107,7 +120,7 @@ public class UserService {
         UserVerificationToken verificationToken = userVerificationTokenRepository.findByToken(token)
                 .orElseThrow(() -> new RuntimeException("Invalid token"));
         User user = verificationToken.getUser();
-        user.setActive(true);
+        user.setStatus(Status.ACTIVE);
         userRepository.save(user);
         return true;
     }
@@ -155,7 +168,7 @@ public class UserService {
     public boolean activateUser(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        user.setActive(true);
+        user.setStatus(Status.ACTIVE);
         userRepository.save(user);
         return user.isActive();
     }
@@ -164,7 +177,7 @@ public class UserService {
     public boolean deactivateUser(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        user.setActive(false);
+        user.setStatus(Status.INACTIVE);
         userRepository.save(user);
         return !user.isActive();
     }
@@ -239,4 +252,124 @@ public class UserService {
     public List<User> getAllUsers() {
         return userRepository.findAll();
     }
+
+    
+    // Vendor events handling
+    public void registerVendor(VendorRegisteredEvent event) {
+        if (userRepository.existsByEmail(event.getEmail())) {
+            throw new RuntimeException("Vendor already registered with this email");
+        }
+
+        User user = new User();
+        user.setEmail(event.getEmail());
+        user.setPassword(event.getPassword()); //password already encoded in vendor service
+        user.setRole(event.getRole());
+        user.setStatus(event.getStatus());
+        user.setUsername(event.getUsername());
+
+        userRepository.save(user);
+    }
+
+	public void verifyVendor(VendorVerifiedEvent event) {
+        if (!userRepository.existsByEmail(event.getEmail())) {
+            throw new RuntimeException("Vendor is not registered with this email");
+        }
+        User user = userRepository.findByEmail(event.getEmail()).get();
+        user.setStatus(Status.ACTIVE);
+        userRepository.save(user);
+	}
+
+	public void updateVendor(UpdateVendorProfileEvent event) {
+        if (!userRepository.existsByEmail(event.getEmail())) {
+            throw new RuntimeException("Vendor is not registered with this email");
+        }
+        User user = userRepository.findByEmail(event.getEmail()).get();
+        user.setUsername(event.getUsername());
+        user.setEmail(event.getEmail());
+        user.setRole(event.getRole());
+        user.setStatus(event.getStatus());
+        userRepository.save(user);
+	}
+	
+	
+    // User events handling	
+    public void registerUser(UserRegisteredEvent event) {
+        if (userRepository.existsByEmail(event.getEmail())) {
+            throw new RuntimeException("User already registered with this email");
+        }
+
+        User user = new User();
+        user.setEmail(event.getEmail());
+        user.setPassword(event.getPassword()); //password already encoded in vendor service
+        user.setRole(event.getRole());
+        user.setStatus(event.getStatus());
+        user.setUsername(event.getUsername());
+
+        userRepository.save(user);
+    }
+
+    //This is related to User from user-service
+	public void verifyUser(UserVerifiedEvent event) {
+        if (!userRepository.existsByEmail(event.getEmail())) {
+            throw new RuntimeException("User is not registered with this email");
+        }
+        User user = userRepository.findByEmail(event.getEmail()).get();
+        user.setStatus(Status.ACTIVE);
+        userRepository.save(user);
+		
+	}
+
+	public void updateUser(UpdateUserProfileEvent event) {
+        if (!userRepository.existsByEmail(event.getEmail())) {
+            throw new RuntimeException("User is not registered with this email");
+        }
+        User user = userRepository.findByEmail(event.getEmail()).get();
+        user.setUsername(event.getUsername());
+        user.setEmail(event.getEmail());
+        user.setRole(event.getRole());
+        user.setStatus(event.getStatus());
+        userRepository.save(user);
+	}
+	
+	public boolean isAvailable(CheckAvailabilityRequest request) {
+	    boolean isEmailTaken = userRepository.existsByEmail(request.getEmail());
+	    boolean isUsernameTaken = userRepository.existsByUsername(request.getUsername());
+	    
+	    return !(isEmailTaken || isUsernameTaken);  // Returns true only if both are available
+	}
+
+	public void cacheLoggedUser(User user) {
+		if (user.getRole()==Role.USER) {
+			authorizationEventPublisher.publishLoggedUserEvent(new LoggedUserEvent(user.getUsername(), user.getEmail()));
+		}else if (user.getRole()==Role.VENDOR) {
+			authorizationEventPublisher.publishLoggedVendorEvent(new LoggedVendorEvent(user.getUsername(), user.getEmail()));
+		}else {
+			//Cache admin if needed
+		}
+	}
+
+	public void tokenValidation(TokenRequestEvent event) {
+		String token = event.getToken();
+		String correlationId = event.getCorrelationId();
+				
+		try {
+            if (tokenBlacklistService.isTokenBlacklisted(token)) {
+            	authorizationEventPublisher.publishTokenValidationResponseEvent(new TokenValidationResponseEvent(false, null, null, null, "Token is blacklisted"));
+            	logger.error("Token is blacklisted for correlationId: {}", event.getCorrelationId());
+           } else if (jwtUtil.isTokenExpired(token)) {
+        	   authorizationEventPublisher.publishTokenValidationResponseEvent(new TokenValidationResponseEvent(false, null, null, null, "Token is expired"));
+        	   logger.error("Token is expired for correlationId: {}", event.getCorrelationId());
+            } else {
+                String username = jwtUtil.extractUsername(token);
+                String email = jwtUtil.extractEmail(token);
+                authorizationEventPublisher.publishTokenValidationResponseEvent(new TokenValidationResponseEvent(true, username, email, correlationId, "Token is valid"));
+         	   	logger.info("Token is valid for correlationId: {}", event.getCorrelationId());
+               
+            }
+		} catch (Exception e) {
+			authorizationEventPublisher.publishTokenValidationResponseEvent(new TokenValidationResponseEvent(false, null, null, null, e.getMessage()));
+			logger.error("Token validation failed for correlationId {}: {}", event.getCorrelationId(), e.getMessage());
+		}
+		
+	}
 }

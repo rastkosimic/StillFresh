@@ -5,10 +5,12 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Component;
-
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import javax.crypto.SecretKey;
+
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -18,16 +20,22 @@ import java.util.function.Function;
 public class JwtUtil {
 
     private final SecretKey secretKey;
-    private final long tokenValidity = 1000 * 60 * 15; // 15 minutes
-    private final long refreshTokenValidity = 1000 * 60 * 60 * 24 * 7; // 7 days
+    private final long tokenValidity = 1000 * 60 * 15;  // 15 minutes
+    private final long refreshTokenValidity = 1000 * 60 * 60 * 24 * 7;  // 7 days
 
-    public JwtUtil() {
-        this.secretKey = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+    // Inject the secret key from application.yml and convert it to SecretKey
+    public JwtUtil(@Value("${jwt.secret}") String secret) {
+        this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
     // Extract username (subject) from token
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
+    }
+
+    // Extract email from token
+    public String extractEmail(String token) {
+        return extractClaim(token, claims -> claims.get("email", String.class));
     }
 
     // Extract expiration date from token
@@ -55,24 +63,38 @@ public class JwtUtil {
         return extractExpiration(token).before(new Date());
     }
 
-    // Generate a token for a user
+    // Generate a token for a vendor
     public String generateToken(UserDetails vendorDetails) {
-    	CustomVendorDetails customVendorDetails = (CustomVendorDetails) vendorDetails;
+        CustomVendorDetails customVendorDetails = (CustomVendorDetails) vendorDetails;
         Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, customVendorDetails.getUsername(), customVendorDetails.getVendor().getRole().name(), tokenValidity);
+        return createToken(
+            claims, 
+            customVendorDetails.getUsername(), 
+            customVendorDetails.getVendor().getEmail(), 
+            customVendorDetails.getVendor().getRole().name(), 
+            tokenValidity
+        );
     }
-    
+
+    // Generate a refresh token for a vendor
     public String generateRefreshToken(UserDetails vendorDetails) {
         CustomVendorDetails customVendorDetails = (CustomVendorDetails) vendorDetails;
         Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, customVendorDetails.getUsername(), customVendorDetails.getVendor().getRole().name(), refreshTokenValidity);
+        return createToken(
+            claims, 
+            customVendorDetails.getUsername(), 
+            customVendorDetails.getVendor().getEmail(), 
+            customVendorDetails.getVendor().getRole().name(), 
+            refreshTokenValidity
+        );
     }
 
     // Create a token with claims
-    private String createToken(Map<String, Object> claims, String subject, String role, long validity) {
+    private String createToken(Map<String, Object> claims, String subject, String email, String role, long validity) {
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(subject)
+                .claim("email", email)  // Add email to claims
                 .claim("role", role)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + validity))
@@ -80,11 +102,10 @@ public class JwtUtil {
                 .compact();
     }
 
-
-    // Validate token against user details
-    public Boolean validateToken(String token, UserDetails userDetails) {
+    // Validate token against vendor details
+    public Boolean validateToken(String token, UserDetails vendorDetails) {
         final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
+        return (username.equals(vendorDetails.getUsername()) && !isTokenExpired(token));
     }
 
     // New method: Get expiration time in milliseconds

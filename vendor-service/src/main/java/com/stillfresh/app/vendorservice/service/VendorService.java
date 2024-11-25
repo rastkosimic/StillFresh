@@ -1,18 +1,28 @@
 package com.stillfresh.app.vendorservice.service;
 
+import com.stillfresh.app.sharedentities.enums.Role;
+import com.stillfresh.app.sharedentities.enums.Status;
+import com.stillfresh.app.sharedentities.shared.events.TokenRequestEvent;
+import com.stillfresh.app.sharedentities.vendor.events.UpdateVendorProfileEvent;
+import com.stillfresh.app.sharedentities.vendor.events.VendorRegisteredEvent;
+import com.stillfresh.app.sharedentities.vendor.events.VendorVerifiedEvent;
 import com.stillfresh.app.vendorservice.dto.PasswordChangeRequest;
 import com.stillfresh.app.vendorservice.model.PasswordResetToken;
 import com.stillfresh.app.vendorservice.model.Vendor;
-import com.stillfresh.app.vendorservice.model.Vendor.Role;
 import com.stillfresh.app.vendorservice.model.VendorVerificationToken;
+import com.stillfresh.app.vendorservice.publisher.VendorEventPublisher;
 import com.stillfresh.app.vendorservice.repository.PasswordResetTokenRepository;
 import com.stillfresh.app.vendorservice.repository.VendorRepository;
 import com.stillfresh.app.vendorservice.repository.VendorVerificationTokenRepository;
+import com.stillfresh.app.vendorservice.security.CustomVendorDetails;
 import com.stillfresh.app.vendorservice.security.JwtUtil;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -48,6 +58,9 @@ public class VendorService {
     
     @Autowired
     JwtUtil jwtUtil;
+    
+    @Autowired
+    private VendorEventPublisher eventPublisher;
 
     private static final Logger logger = LoggerFactory.getLogger(VendorService.class);
     
@@ -64,7 +77,7 @@ public class VendorService {
 
         vendor.setPassword(passwordEncoder.encode(vendor.getPassword()));
         vendor.setRole(Role.ADMIN);  // Assign the ADMIN role
-        vendor.setActive(true);  // Admin is active by default
+        vendor.setStatus(Status.ACTIVE);
 
         // Save the admin to the database
         return vendorRepository.save(vendor);
@@ -76,7 +89,7 @@ public class VendorService {
         }
         vendor.setPassword(passwordEncoder.encode(vendor.getPassword()));
         vendor.setRole(Role.VENDOR);
-        vendor.setActive(false);  // Inactive until verified
+        vendor.setStatus(Status.INACTIVE);  // Inactive until verified
         vendorRepository.save(vendor);
 
         // Generate verification token
@@ -90,7 +103,10 @@ public class VendorService {
         
         String verificationUrl = "http://localhost:8083/vendors/verify?token=" + token;
         emailService.sendVerificationEmail(vendor.getEmail(), verificationUrl);
-
+        
+        //Creating an event that will be utilized by authorization-service
+        eventPublisher.publishVendorRegisteredEvent(new VendorRegisteredEvent(vendor.getEmail(), vendor.getPassword(), vendor.getStatus(), vendor.getRole(), vendor.getUsername()));
+        
         return vendor;
     }
 
@@ -98,12 +114,25 @@ public class VendorService {
         VendorVerificationToken verificationToken = vendorVerificationTokenRepository.findByToken(token)
                 .orElseThrow(() -> new RuntimeException("Invalid token"));
         Vendor vendor = verificationToken.getVendor();
-        vendor.setActive(true);
+        vendor.setStatus(Status.ACTIVE);
         vendorRepository.save(vendor);
+        
+        // Publish VendorVerifiedEvent after successful verification. This will be utilized by authorization-service
+        eventPublisher.publishVendorVerifiedEvent(new VendorVerifiedEvent(vendor.getEmail())); //treba napraviti event za user verified
         return true;
     }
     
-    public void sendPasswordResetLink(String email) throws IOException {
+    @CachePut(value = "vendor", key = "#email")
+    public void cacheVendorOnLogin(String email) {
+    	findVendorByEmail(email);
+    }
+    
+    @Cacheable(value = "vendor", key = "#email", unless = "#result == null")
+    private Optional<Vendor> findVendorByEmail(String email) {
+    	return vendorRepository.findByEmail(email);	
+	}
+
+	public void sendPasswordResetLink(String email) throws IOException {
         Vendor vendor = vendorRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Vendor not found with email: " + email));
 
@@ -143,7 +172,7 @@ public class VendorService {
     
     public Vendor findVendorById(Long id) {
         Optional<Vendor> user = vendorRepository.findById(id);
-        logger.info("Finding a user {}, with id: {}", user.map(Vendor::getName).orElse("Not found"), id);
+        logger.info("Finding a user {}, with id: {}", user.map(Vendor::getUsername).orElse("Not found"), id);
         return user.orElseThrow(() -> new RuntimeException("User not found"));
     }
 
@@ -153,16 +182,19 @@ public class VendorService {
         return new Date(now.getTime() + (hours * 60 * 60 * 1000));  // Expiry time in milliseconds
     }
     
-    public void updateVendorProfile(Long id, Vendor updatedVendor) {
-        Vendor existingVendor = vendorRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Vendor not found"));
+    public void updateVendorProfile(Vendor updatedVendor) {
         
+        CustomVendorDetails customVendorDetails = (CustomVendorDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Vendor currentVendor = customVendorDetails.getVendor();
         // Update only relevant fields
-        existingVendor.setName(updatedVendor.getName());
-        existingVendor.setAddress(updatedVendor.getAddress());
-        existingVendor.setPhone(updatedVendor.getPhone());
+        currentVendor.setUsername(updatedVendor.getUsername());
+        currentVendor.setAddress(updatedVendor.getAddress());
+        currentVendor.setPhone(updatedVendor.getPhone());
+        vendorRepository.save(currentVendor);
         
-        vendorRepository.save(existingVendor);
+        //Creating an event that will be utilized by authorization-service
+        eventPublisher.publishUpdateVendorProfileEvent(new UpdateVendorProfileEvent(currentVendor.getUsername(), currentVendor.getEmail(), currentVendor.getPassword(), currentVendor.getRole(), currentVendor.getStatus()));
+        
     }
 
 
@@ -192,7 +224,7 @@ public class VendorService {
 	
     // Check if a Super-Admin exists
     public boolean hasSuperAdmin() {
-        return vendorRepository.existsByRole(Vendor.Role.SUPER_ADMIN);
+        return vendorRepository.existsByRole(Role.SUPER_ADMIN);
     }
 
     // Method to register the first Super-Admin
@@ -203,7 +235,7 @@ public class VendorService {
 
         admin.setPassword(passwordEncoder.encode(admin.getPassword()));
         admin.setRole(Role.SUPER_ADMIN);
-        admin.setActive(true); // Automatically activate the Super-Admin
+        admin.setStatus(Status.ACTIVE);; // Automatically activate the Super-Admin
         return vendorRepository.save(admin);
     }
 	
@@ -231,7 +263,7 @@ public class VendorService {
         }
         vendor.setPassword(passwordEncoder.encode(vendor.getPassword()));
         vendor.setRole(isAdmin ? Role.ADMIN : Role.VENDOR);  // Set role based on input
-        vendor.setActive(false);  // Inactive until verified
+        vendor.setStatus(Status.INACTIVE);  // Inactive until verified
         vendorRepository.save(vendor);
 
       // Generate verification token
@@ -245,6 +277,9 @@ public class VendorService {
       
       String verificationUrl = "http://localhost:8083/vendors/verify?token=" + token;
       emailService.sendVerificationEmail(vendor.getEmail(), verificationUrl);
+      
+      //Creating an event that will be utilized by authorization-service
+      eventPublisher.publishVendorRegisteredEvent(new VendorRegisteredEvent(vendor.getEmail(), vendor.getPassword(), vendor.getStatus(), vendor.getRole(), vendor.getUsername()));
 
         return vendor;
     }
@@ -266,11 +301,16 @@ public class VendorService {
     public List<Vendor> getAllVendors() {
         return vendorRepository.findAll();
     }
+    
+	@Cacheable(value = "vendor", key = "#email", unless = "#result == null")
+	public Optional<Vendor> findByEmail(String email) {
+		return vendorRepository.findByEmail(email);
+	}
 
     public boolean toggleVendorActivation(Long id) {
         Vendor vendor = vendorRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Vendor not found"));
-        vendor.setActive(!vendor.isActive());
+        vendor.setStatus(vendor.getStatus() == Status.ACTIVE ? Status.INACTIVE : Status.ACTIVE);
         vendorRepository.save(vendor);
         return vendor.isActive();
     }
@@ -293,7 +333,7 @@ public class VendorService {
     public boolean activateVendor(Long id) {
         Vendor vendor = vendorRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Vendor not found"));
-        vendor.setActive(true); // Set active to true
+        vendor.setStatus(Status.ACTIVE); // Set active to true
         vendorRepository.save(vendor);
         return vendor.isActive();
     }
@@ -302,7 +342,7 @@ public class VendorService {
     public boolean deactivateVendor(Long id) {
         Vendor vendor = vendorRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Vendor not found"));
-        vendor.setActive(false); // Set active to false
+        vendor.setStatus(Status.INACTIVE); // Set active to false
         vendorRepository.save(vendor);
         return !vendor.isActive();
     }
@@ -320,5 +360,30 @@ public class VendorService {
         vendorRepository.save(vendor);
     }
 
+    @CacheEvict(value = "vendor", allEntries = true)
+	public ResponseEntity<String> deleteVendorProfile(String authorizationHeader) {
+	    if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+	        throw new RuntimeException("Invalid Authorization header");
+	    }
+	    String jwt = authorizationHeader.substring(7); // Remove "Bearer " prefix
+	    
+	    String email = jwtUtil.extractEmail(jwt);
+		
+	    // Retrieve the user from the cache
+	    Optional<Vendor> cachedVendor = findByEmail(email);
+	    if (cachedVendor.isEmpty()) {
+	        throw new RuntimeException("Vendor not found in cache");
+	    }
+
+	    Vendor vendor = cachedVendor.get();
+
+	    // Mark the user as deleted
+	    vendor.setStatus(Status.DELETED);
+	    vendorRepository.save(vendor);
+        //obavesti auth servis da je status promenjen. tamo ga isto setuj kao deleted. takodje u auth servisu bleklistuj token
+	    eventPublisher.publishUpdateVendorProfileEvent(new UpdateVendorProfileEvent(vendor.getUsername(), vendor.getEmail(), vendor.getPassword(), vendor.getRole(), vendor.getStatus()));
+	    eventPublisher.publishTokenInvalidationRequest(new TokenRequestEvent(jwt, null));
+        return ResponseEntity.ok("Vendor deleted successfully");
+	}
 
 }

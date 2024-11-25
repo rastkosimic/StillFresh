@@ -28,20 +28,13 @@ public class CustomVendorDetailsService implements UserDetailsService {
             vendor = vendorRepository.findByEmail(identifier)
                     .orElseThrow(() -> new UsernameNotFoundException("Vendor not found with email: " + identifier));
         } else {
-            vendor = vendorRepository.findByName(identifier)
+            vendor = vendorRepository.findByUsername(identifier)
                     .orElseThrow(() -> new UsernameNotFoundException("Vendor not found with name: " + identifier));
         }
 
         logger.info("Loaded Vendor Password Hash: " + vendor.getPassword());
         return new CustomVendorDetails(vendor);
     }
-//    public UserDetails loadUserByUsername(String name) throws UsernameNotFoundException {
-//        Vendor vendor = vendorRepository.findByName(name)
-//                .orElseThrow(() -> new UsernameNotFoundException("Vendor not found with name: " + name));
-//
-//        logger.info("Loaded Vendor Password Hash: " + vendor.getPassword());
-//        return new CustomVendorDetails(vendor);
-//    }
     
     public UserDetails loadUserByEmail(String email) throws UsernameNotFoundException {
         Vendor vendor = vendorRepository.findByEmail(email)
@@ -59,7 +52,7 @@ public class CustomVendorDetailsService implements UserDetailsService {
             vendor = vendorRepository.findByEmail(identifier)
                     .orElseThrow(() -> new UsernameNotFoundException("Vendor not found with email: " + identifier));
         } else {
-            vendor = vendorRepository.findByName(identifier)
+            vendor = vendorRepository.findByUsername(identifier)
                     .orElseThrow(() -> new UsernameNotFoundException("Vendor not found with name: " + identifier));
         }
 

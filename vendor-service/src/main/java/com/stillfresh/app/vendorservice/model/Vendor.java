@@ -1,6 +1,7 @@
 package com.stillfresh.app.vendorservice.model;
 
 import com.stillfresh.app.sharedentities.enums.Role;
+import com.stillfresh.app.sharedentities.enums.Status;
 import com.stillfresh.app.sharedentities.interfaces.Account;
 
 import jakarta.persistence.CascadeType;
@@ -23,7 +24,7 @@ public class Vendor implements Account{
     private Long id;
     
     @NotBlank(message = "Name cannot be blank")
-    private String name;
+    private String username;
 
     @Email(message = "Email should be valid")
     @NotBlank(message = "Email cannot be blank")
@@ -37,11 +38,12 @@ public class Vendor implements Account{
 
     @Size(min = 6, message = "Password must be at least 6 characters long")
     private String password;
-
-    private boolean active;
     
     @Enumerated(EnumType.STRING)
     private Role role;  // Role field
+    
+    @Enumerated(EnumType.STRING)
+    private Status status;
     
     @OneToOne(mappedBy = "vendor", cascade = CascadeType.ALL, orphanRemoval = true)
     private VendorVerificationToken vendorVerificationToken;
@@ -55,12 +57,13 @@ public class Vendor implements Account{
 		this.id = id;
 	}
 
-	public String getName() {
-		return name;
+	@Override
+	public String getUsername() {
+		return username;
 	}
 
-	public void setName(String name) {
-		this.name = name;
+	public void setUsername(String username) {
+		this.username = username;
 	}
 
 	public String getEmail() {
@@ -96,11 +99,7 @@ public class Vendor implements Account{
 	}
 
 	public boolean isActive() {
-		return active;
-	}
-
-	public void setActive(boolean active) {
-		this.active = active;
+	    return this.status == Status.ACTIVE;
 	}
 	
     public Role getRole() {
@@ -110,6 +109,15 @@ public class Vendor implements Account{
     public void setRole(Role role) {
         this.role = role;
     }
+
+	@Override
+	public Status getStatus() {
+		return status;
+	}
+	
+	public void setStatus(Status status) {
+		this.status = status;
+	}
 
 }
 

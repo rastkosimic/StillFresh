@@ -31,6 +31,14 @@
         </dependencies>
     </dependencyManagement>
 
+    <dependencies>
+        <!-- Kafka dependencies -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+    </dependencies>
+
     <modules>
         <module>api-gateway</module>
         <module>user-service</module>

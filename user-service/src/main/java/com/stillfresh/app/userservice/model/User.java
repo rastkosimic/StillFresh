@@ -1,6 +1,7 @@
 package com.stillfresh.app.userservice.model;
 
 import com.stillfresh.app.sharedentities.enums.Role;
+import com.stillfresh.app.sharedentities.enums.Status;
 import com.stillfresh.app.sharedentities.interfaces.Account;
 
 import jakarta.persistence.Entity;
@@ -43,7 +44,8 @@ public class User implements Account{
     @Enumerated(EnumType.STRING)
     private Role role;
 
-    private Boolean active = false;
+    @Enumerated(EnumType.STRING)
+    private Status status;
 
     // Getters and Setters
     public Long getId() {
@@ -86,11 +88,16 @@ public class User implements Account{
         this.role = role;
     }
     
-    public boolean isActive() {
-        return active;
-    }
+    public Status getStatus() {
+		return status;
+	}
 
-    public void setActive(Boolean active) {
-        this.active = active;
-    }
+	public void setStatus(Status status) {
+		this.status = status;
+	}
+	
+	public boolean isActive() {
+	    return this.status == Status.ACTIVE;
+	}
+
 }

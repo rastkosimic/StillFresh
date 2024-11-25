@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     role VARCHAR(50) NOT NULL,
-    active BOOLEAN DEFAULT TRUE
+    status VARCHAR(50) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS roles (
@@ -22,4 +22,8 @@ CREATE TABLE IF NOT EXISTS roles (
 
 -- Insert initial super-admin user
 INSERT INTO users (username, email, password, role, active) VALUES 
-('super admin', 'super_admin@stillfresh.com', '$2a$10$l4y6sYVoBMkcsvOJi8wx/.WQZUPDj9qPjNeWuoDWOcOKxACIYayQ6', 'SUPER_ADMIN', TRUE);
+('super admin', 'super_admin@stillfresh.com', '$2a$10$l4y6sYVoBMkcsvOJi8wx/.WQZUPDj9qPjNeWuoDWOcOKxACIYayQ6', 'SUPER_ADMIN', 'ACTIVE');
+
+
+ALTER TABLE users DROP CONSTRAINT users_role_check;
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role::text = ANY (ARRAY['USER'::character varying, 'ADMIN'::character varying, 'SUPER_ADMIN'::character varying, 'VENDOR'::character varying]::text[]));

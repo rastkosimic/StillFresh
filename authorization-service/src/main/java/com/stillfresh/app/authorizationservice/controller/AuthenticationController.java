@@ -5,6 +5,13 @@ import com.stillfresh.app.authorizationservice.security.CustomUserDetails;
 import com.stillfresh.app.authorizationservice.security.JwtUtil;
 import com.stillfresh.app.authorizationservice.service.CustomUserDetailsService;
 import com.stillfresh.app.authorizationservice.service.TokenBlacklistService;
+import com.stillfresh.app.sharedentities.dto.CheckAvailabilityRequest;
+import com.stillfresh.app.sharedentities.enums.Status;
+import com.stillfresh.app.sharedentities.responses.ApiResponse;
+import com.stillfresh.app.sharedentities.responses.ErrorResponse;
+import com.stillfresh.app.authorizationservice.service.UserService;
+
+import io.swagger.v3.oas.annotations.Operation;
 
 import java.util.Map;
 
@@ -20,6 +27,9 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/auth")
 public class AuthenticationController {
+	
+    @Autowired
+    private UserService userService;
 
     @Autowired
     private TokenBlacklistService tokenBlacklistService;
@@ -32,6 +42,20 @@ public class AuthenticationController {
 
     @Autowired
     private CustomUserDetailsService userDetailsService;
+    
+    @Operation(summary = "Check if username and email are unique")
+    @PostMapping("/check-availability")
+    public ResponseEntity<ApiResponse> checkAvailability(@RequestBody CheckAvailabilityRequest request) {
+        boolean isAvailable = userService.isAvailable(request);
+
+        if (!isAvailable) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                                 .body(new ApiResponse(false, "Email or Username already taken"));
+        }
+
+        return ResponseEntity.ok(new ApiResponse(true, "Username and Email are available"));
+    }
+    
 
     @PostMapping("/login")
     public ResponseEntity<String> login(@RequestBody AuthenticationRequest authenticationRequest) throws Exception {
@@ -51,9 +75,15 @@ public class AuthenticationController {
         UserDetails userDetails = userDetailsService.loadUserByUsername(identifier);
         CustomUserDetails customUserDetails = (CustomUserDetails) userDetails;
 
-        if (!customUserDetails.getUser().isActive()) {
+        if (customUserDetails.getUser().getStatus() == Status.INACTIVE) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User account is not verified.");
+        } else if (customUserDetails.getUser().getStatus() == Status.DELETED) {
+            return ResponseEntity.status(HttpStatus.GONE).body("User account is deleted.");
         }
+
+        
+        //u zavisnosti da li je user vendor ili user okidati razlicite evente
+        userService.cacheLoggedUser(customUserDetails.getUser());
 
         // Generate JWT token
         final String jwt = jwtUtil.generateToken(userDetails);

@@ -1,5 +1,9 @@
 package com.stillfresh.app.vendorservice.controller;
 
+import com.stillfresh.app.vendorservice.client.AuthorizationServiceClient;
+import com.stillfresh.app.sharedentities.dto.CheckAvailabilityRequest;
+import com.stillfresh.app.sharedentities.responses.ApiResponse;
+import com.stillfresh.app.sharedentities.responses.ErrorResponse;
 import com.stillfresh.app.vendorservice.dto.PasswordChangeRequest;
 import com.stillfresh.app.vendorservice.model.Vendor;
 import com.stillfresh.app.vendorservice.security.CustomVendorDetails;
@@ -8,6 +12,8 @@ import com.stillfresh.app.vendorservice.service.VendorService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,14 +28,43 @@ import java.io.IOException;
 @RequestMapping("/vendors")
 public class VendorController {
 
+	private static final Logger logger = LoggerFactory.getLogger(VendorController.class);
+	 
     @Autowired
     private VendorService vendorService;
     
+    @Autowired
+    private AuthorizationServiceClient authorizationServiceClient;
+    
     // Regular vendor registration
     @PostMapping("/register")
-    public ResponseEntity<String> registerVendor(@RequestBody Vendor vendor) throws IOException {
-        vendorService.registerVendor(vendor, false);  // False indicates normal vendor registration
-        return ResponseEntity.ok("Vendor registration successful. Please verify your email.");
+    public ResponseEntity<?> registerVendor(@RequestBody Vendor vendor) throws IOException {
+    	
+        // Call the authorization service to check availability
+        ResponseEntity<ApiResponse> availabilityResponse = authorizationServiceClient.checkAvailability(
+            new CheckAvailabilityRequest(vendor.getUsername(), vendor.getEmail()));
+
+        // If the response indicates a conflict (username/email already taken)
+        logger.info("availabilityResponse.getStatusCode()" + availabilityResponse.getStatusCode());
+        logger.info("HttpStatus.CONFLICT" + HttpStatus.CONFLICT);
+        if (availabilityResponse.getStatusCode() == HttpStatus.CONFLICT) {
+            // Return the conflict response
+        	logger.info("PROSLO Check za conflickt");
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(availabilityResponse.getBody());
+        }
+
+        try {
+            // If available, proceed to initiate registration
+            vendorService.registerVendor(vendor);
+            return ResponseEntity.ok(new ApiResponse(true, "Vendor registration initiated. Check your email for verification."));
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                 .body(new ErrorResponse("Failed to initiate registration: " + ex.getMessage()));
+        }
+    	
+    	
+//        vendorService.registerVendor(vendor, false);  // False indicates normal vendor registration
+//        return ResponseEntity.ok("Vendor registration successful. Please verify your email.");
     }
 
     // Admin registration (can be restricted to other admins using @PreAuthorize)
@@ -76,13 +111,13 @@ public class VendorController {
         return ResponseEntity.ok(user);
     }
     
-    @PutMapping("/{id}")
-    public ResponseEntity<String> updateVendorProfile(@PathVariable Long id, @Valid @RequestBody Vendor updatedVendor, BindingResult result) {
+    @PutMapping("/profile")
+    public ResponseEntity<String> updateVendorProfile(@Valid @RequestBody Vendor updatedVendor, BindingResult result) {
   
         if (result.hasErrors()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result.getAllErrors().get(0).getDefaultMessage());
         }
-        vendorService.updateVendorProfile(id, updatedVendor);
+        vendorService.updateVendorProfile(updatedVendor);
         return ResponseEntity.ok("Vendor profile updated successfully");
     }
     
@@ -113,6 +148,10 @@ public class VendorController {
 
         return passwordChangeResponse;
     }
-
+    
+    @DeleteMapping("/delete")
+    public ResponseEntity<?> deleteVendor(@RequestHeader("Authorization") String token) {
+    	return vendorService.deleteVendorProfile(token);
+    }
 
 }

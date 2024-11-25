@@ -32,7 +32,7 @@ public class CustomVendorDetails implements UserDetails {
 
     @Override
     public String getUsername() {
-        return vendor.getName();
+        return vendor.getUsername();
     }
     
     public String getEmail() {

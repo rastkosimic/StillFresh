@@ -1,14 +1,26 @@
 package com.stillfresh.app.userservice.service;
 
+import com.stillfresh.app.sharedentities.enums.Role;
+import com.stillfresh.app.sharedentities.enums.Status;
+import com.stillfresh.app.sharedentities.exceptions.ResourceNotFoundException;
+import com.stillfresh.app.sharedentities.shared.events.TokenRequestEvent;
+import com.stillfresh.app.sharedentities.shared.events.TokenValidationResponseEvent;
+import com.stillfresh.app.sharedentities.user.events.UpdateUserProfileEvent;
+import com.stillfresh.app.sharedentities.user.events.UserRegisteredEvent;
+import com.stillfresh.app.sharedentities.user.events.UserVerifiedEvent;
 import com.stillfresh.app.userservice.dto.PasswordChangeRequest;
-import com.stillfresh.app.userservice.exception.ResourceNotFoundException;
 import com.stillfresh.app.userservice.model.User;
-import com.stillfresh.app.userservice.model.User.Role;
+import com.stillfresh.app.userservice.model.VerificationToken;
+import com.stillfresh.app.userservice.publisher.UserEventPublisher;
 import com.stillfresh.app.userservice.repository.UserRepository;
+import com.stillfresh.app.userservice.repository.VerificationTokenRepository;
+import com.stillfresh.app.userservice.security.CustomUserDetails;
 import com.stillfresh.app.userservice.security.JwtUtil;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,33 +51,79 @@ public class UserService {
     @Autowired
     private TokenBlacklistService tokenBlacklistService;
     
+    @Autowired
+    private UserEventPublisher eventPublisher;
+    
+    @Autowired
+    private VerificationTokenRepository verificationTokenRepository;
+    
+    @Autowired
+    private EmailService emailService;
+    
     private static final Logger logger = LoggerFactory.getLogger(UserService.class);
+    
     
     @Caching(evict = {
         @CacheEvict(value = "users", key = "#user.username"),
         @CacheEvict(value = "users", key = "#user.email")
     })
-    public User registerUser(User user) {
-        if (userRepository.existsByUsername(user.getUsername())) {
-            throw new IllegalArgumentException("Username is already taken");
-        }
-
-        if (userRepository.existsByEmail(user.getEmail())) {
-            throw new IllegalArgumentException("Email is already registered");
-        }
+    public User registerUser(User user) throws IOException {
         
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         user.setRole(Role.USER);  // Default role
+        user.setStatus(Status.INACTIVE);
         
         logger.info("Registering user with username: {}", user.getUsername());
+        userRepository.save(user);
         
-        return userRepository.save(user);
+        // Generate and save verification token
+        String token = UUID.randomUUID().toString();
+        VerificationToken verificationToken = new VerificationToken();
+        verificationToken.setToken(token);
+        verificationToken.setUser(user);
+        verificationTokenRepository.save(verificationToken);
+
+        // Send verification email
+        String verificationUrl = "http://localhost:8081/users/verify?token=" + token;
+        emailService.sendVerificationEmail(user.getEmail(), verificationUrl);
+        
+        //Creating an event that will be utilized by authorization-service
+        eventPublisher.publishUserRegisteredEvent(new UserRegisteredEvent(user.getEmail(), user.getPassword(), user.getStatus(), user.getRole(), user.getUsername()));
+
+        
+        return user;
     }
 
-    @CachePut(value = "users", key = "#user.id")
-    public User updateUser(User user) {
-        logger.info("Updating user with username: {}", user.getUsername());
-        return userRepository.save(user);
+//    @CachePut(value = "users", key = "#user.id") komentarisano jer nisam siguran da li radi kada sam promenio verifyUser na boolean
+    public boolean verifyUser(String token) {
+        VerificationToken verificationToken = verificationTokenRepository.findByToken(token)
+                .orElseThrow(() -> new RuntimeException("Invalid token"));
+        User user = verificationToken.getUser();
+        user.setStatus(Status.ACTIVE);
+        userRepository.save(user);
+        
+      //Creating an event that will be utilized by authorization-service
+        eventPublisher.publishUserVerifiedEvent(new UserVerifiedEvent(user.getEmail()));
+        		
+        return true;
+    }
+    
+    @CachePut(value = "users", key = "#email")
+    public void cacheUserOnLogin(String email) {
+    	findByEmail(email);
+    }
+    
+    public void updateUser(User updatedUser) {
+        CustomUserDetails customUserDetails = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        User currentUser = customUserDetails.getUser();
+
+        currentUser.setUsername(updatedUser.getUsername());
+        // Add other fields as needed
+        userRepository.save(currentUser);
+        
+        //Creating an event that will be utilized by authorization-service
+        eventPublisher.publishUpdateUserProfileEvent(new UpdateUserProfileEvent(currentUser.getUsername(), currentUser.getEmail(), currentUser.getPassword(), currentUser.getRole(), currentUser.getStatus()));
+        
     }
     
     @CacheEvict(value = "users", allEntries = true)
@@ -161,4 +219,31 @@ public class UserService {
 
         SecurityContextHolder.clearContext();
     }
+
+    @CacheEvict(value = "users", allEntries = true)
+	public ResponseEntity<String> deleteUserProfile(String authorizationHeader) {
+	    if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+	        throw new RuntimeException("Invalid Authorization header");
+	    }
+	    String jwt = authorizationHeader.substring(7); // Remove "Bearer " prefix
+	    
+	    String email = jwtUtil.extractEmail(jwt);
+		
+	    // Retrieve the user from the cache
+	    Optional<User> cachedUser = findByEmail(email);
+	    if (cachedUser.isEmpty()) {
+	        throw new RuntimeException("User not found in cache");
+	    }
+
+	    User user = cachedUser.get();
+
+	    // Mark the user as deleted
+	    user.setStatus(Status.DELETED);
+	    userRepository.save(user);
+        //letting know authorization-service about the status change String username, String email, String password, Role role, Status status
+	    eventPublisher.publishUpdateUserProfileEvent(new UpdateUserProfileEvent(user.getUsername(), user.getEmail(), user.getPassword(), user.getRole(), user.getStatus()));
+	    eventPublisher.publishTokenInvalidationRequest(new TokenRequestEvent(jwt, null));
+        return ResponseEntity.ok("User deleted successfully");
+	}
+
 }

@@ -1,7 +1,7 @@
 package com.stillfresh.app.authorizationservice.repository;
 
 import com.stillfresh.app.authorizationservice.model.User;
-import com.stillfresh.app.authorizationservice.model.User.Role;
+import com.stillfresh.app.sharedentities.enums.Role;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

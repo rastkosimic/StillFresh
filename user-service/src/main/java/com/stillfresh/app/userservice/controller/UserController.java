@@ -1,5 +1,9 @@
 package com.stillfresh.app.userservice.controller;
 
+import com.stillfresh.app.userservice.client.AuthorizationServiceClient;
+import com.stillfresh.app.sharedentities.dto.CheckAvailabilityRequest;
+import com.stillfresh.app.sharedentities.responses.ApiResponse;
+import com.stillfresh.app.sharedentities.responses.ErrorResponse;
 import com.stillfresh.app.userservice.dto.PasswordChangeRequest;
 import com.stillfresh.app.userservice.model.AuthenticationRequest;
 import com.stillfresh.app.userservice.model.PasswordResetToken;
@@ -44,12 +48,6 @@ public class UserController {
 
     @Autowired
     private UserService userService;
-
-    @Autowired
-    private LoginAttemptService loginAttemptService;
-
-    @Autowired
-    private VerificationTokenRepository verificationTokenRepository;
     
     @Autowired
     private PasswordResetTokenRepository passwordResetTokenRepository;
@@ -58,41 +56,44 @@ public class UserController {
     private EmailService emailService;
     
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private AuthorizationServiceClient authorizationServiceClient;
 
     @Operation(summary = "Register a new user", description = "This endpoint registers a new user and sends a verification email.")
     @PostMapping("/register")
-    public ResponseEntity<String> registerUser(@Valid @RequestBody User user) throws IOException {
-        userService.registerUser(user);
+    public ResponseEntity<?> registerUser(@Valid @RequestBody User user) throws IOException {
+    	
 
-        // Generate and save verification token
-        String token = UUID.randomUUID().toString();
-        VerificationToken verificationToken = new VerificationToken();
-        verificationToken.setToken(token);
-        verificationToken.setUser(user);
-        verificationTokenRepository.save(verificationToken);
+        // Call the authorization service to check availability
+        ResponseEntity<ApiResponse> availabilityResponse = authorizationServiceClient.checkAvailability(
+            new CheckAvailabilityRequest(user.getUsername(), user.getEmail()));
 
-        // Send verification email
-        String verificationUrl = "http://localhost:8081/users/verify?token=" + token;
-        emailService.sendVerificationEmail(user.getEmail(), verificationUrl);
+        // If the response indicates a conflict (username/email already taken)
+        if (availabilityResponse.getStatusCode() == HttpStatus.CONFLICT) {
+            // Return the conflict response
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(availabilityResponse.getBody());
+        }
 
-        return ResponseEntity.ok("User registered successfully. Please check your email for verification.");
+        try {
+            // If available, proceed to initiate registration
+            userService.registerUser(user);
+            return ResponseEntity.ok(new ApiResponse(true, "User registration initiated. Check your email for verification."));
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                 .body(new ErrorResponse("Failed to initiate registration: " + ex.getMessage()));
+        }
     }
 
     @Operation(summary = "Verify a user", description = "Verifies a user account using the token sent via email.")
     @GetMapping("/verify")
     public ResponseEntity<String> verifyUser(@RequestParam("token") String token) {
-        VerificationToken verificationToken = verificationTokenRepository.findByToken(token);
-
-        if (verificationToken == null || verificationToken.isExpired()) {
-            return ResponseEntity.status(400).body("Invalid or expired token");
+        boolean isVerified = userService.verifyUser(token);
+        
+        if (isVerified) {
+            return ResponseEntity.ok("User verified successfully.");
+        } else {
+            return ResponseEntity.status(400).body("Invalid token.");
         }
-
-        User user = verificationToken.getUser();
-        user.setActive(true);
-        userService.updateUser(user);
-
-        return ResponseEntity.ok("Account verified successfully");
+        
     }
 
     @Operation(summary = "Admin Endpoint", description = "Access restricted to users with ADMIN role.")
@@ -118,16 +119,14 @@ public class UserController {
 
     @Operation(summary = "Update user profile", description = "Allows a user to update their profile information.")
     @PutMapping("/profile")
-    public ResponseEntity<User> updateUserProfile(@RequestBody User updatedUserDetails) {
-        CustomUserDetails customUserDetails = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        User currentUser = customUserDetails.getUser();
+    public ResponseEntity<String> updateUserProfile(@Valid @RequestBody User updatedUserDetails, BindingResult result) {
+    	
+        if (result.hasErrors()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result.getAllErrors().get(0).getDefaultMessage());
+        }
 
-        currentUser.setUsername(updatedUserDetails.getUsername());
-        currentUser.setEmail(updatedUserDetails.getEmail());
-        // Add other fields as needed
-
-        User updatedUser = userService.updateUser(currentUser);
-        return ResponseEntity.ok(updatedUser);
+        userService.updateUser(updatedUserDetails);
+        return ResponseEntity.ok("User profile successfully updated");
     }
 
     @Operation(summary = "Change password", description = "Allows a user to change their password.")
@@ -212,5 +211,10 @@ public class UserController {
         userService.changeUserPassword(user, newPassword);
 
         return ResponseEntity.ok("Password reset successfully");
+    }
+    
+    @DeleteMapping("/delete")
+    public ResponseEntity<?> deleteUser(@RequestHeader("Authorization") String token) {
+    	return userService.deleteUserProfile(token);
     }
 }
