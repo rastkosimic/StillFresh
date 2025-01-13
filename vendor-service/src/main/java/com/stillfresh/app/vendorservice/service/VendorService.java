@@ -1,11 +1,18 @@
 package com.stillfresh.app.vendorservice.service;
 
+import com.stillfresh.app.sharedentities.dto.OfferDto;
 import com.stillfresh.app.sharedentities.enums.Role;
 import com.stillfresh.app.sharedentities.enums.Status;
+import com.stillfresh.app.sharedentities.offer.events.AllOffersInvalidationEvent;
+import com.stillfresh.app.sharedentities.offer.events.OfferCreationEvent;
+import com.stillfresh.app.sharedentities.offer.events.OfferInvalidationEvent;
+import com.stillfresh.app.sharedentities.offer.events.OfferUpdateEvent;
 import com.stillfresh.app.sharedentities.shared.events.TokenRequestEvent;
+import com.stillfresh.app.sharedentities.vendor.events.OfferRelatedVendorDetailsEvent;
 import com.stillfresh.app.sharedentities.vendor.events.UpdateVendorProfileEvent;
 import com.stillfresh.app.sharedentities.vendor.events.VendorRegisteredEvent;
 import com.stillfresh.app.sharedentities.vendor.events.VendorVerifiedEvent;
+import com.stillfresh.app.vendorservice.client.OfferClient;
 import com.stillfresh.app.vendorservice.dto.PasswordChangeRequest;
 import com.stillfresh.app.vendorservice.model.PasswordResetToken;
 import com.stillfresh.app.vendorservice.model.Vendor;
@@ -30,6 +37,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.Date;
@@ -55,12 +63,18 @@ public class VendorService {
     
     @Autowired
     private TokenBlacklistService tokenBlacklistService;
+
+    @Autowired
+    private GeoLocationService geoLocationService;
     
     @Autowired
     JwtUtil jwtUtil;
     
     @Autowired
     private VendorEventPublisher eventPublisher;
+    
+    @Autowired
+    private OfferClient offerClient;
 
     private static final Logger logger = LoggerFactory.getLogger(VendorService.class);
     
@@ -86,10 +100,18 @@ public class VendorService {
     public Vendor registerVendor(Vendor vendor) throws IOException {
         if (vendorRepository.existsByEmail(vendor.getEmail())) {
             throw new RuntimeException("Vendor already registered with this email");
-        }
+        }     
         vendor.setPassword(passwordEncoder.encode(vendor.getPassword()));
         vendor.setRole(Role.VENDOR);
         vendor.setStatus(Status.INACTIVE);  // Inactive until verified
+        
+        // Fetch and assign geo-coordinates
+        double[] coordinates = geoLocationService.getCoordinates(vendor.getAddress());
+        if (coordinates != null) {
+            vendor.setLatitude(coordinates[0]);
+            vendor.setLongitude(coordinates[1]);
+        }
+        
         vendorRepository.save(vendor);
 
         // Generate verification token
@@ -170,10 +192,11 @@ public class VendorService {
         passwordResetTokenRepository.delete(resetToken);
     }
     
+    @Cacheable(value = "vendor", key = "#id", unless = "#result == null")
     public Vendor findVendorById(Long id) {
-        Optional<Vendor> user = vendorRepository.findById(id);
-        logger.info("Finding a user {}, with id: {}", user.map(Vendor::getUsername).orElse("Not found"), id);
-        return user.orElseThrow(() -> new RuntimeException("User not found"));
+        Optional<Vendor> vendor = vendorRepository.findById(id);
+        logger.info("Finding a vendor {}, with id: {}", vendor.map(Vendor::getUsername).orElse("Not found"), id);
+        return vendor.orElseThrow(() -> new RuntimeException("Vendor not found"));
     }
 
 
@@ -182,19 +205,77 @@ public class VendorService {
         return new Date(now.getTime() + (hours * 60 * 60 * 1000));  // Expiry time in milliseconds
     }
     
-    public void updateVendorProfile(Vendor updatedVendor) {
+    public void updateVendorProfile(String authorizationHeader, Vendor updatedVendor) {
         
-        CustomVendorDetails customVendorDetails = (CustomVendorDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        Vendor currentVendor = customVendorDetails.getVendor();
-        // Update only relevant fields
-        currentVendor.setUsername(updatedVendor.getUsername());
-        currentVendor.setAddress(updatedVendor.getAddress());
-        currentVendor.setPhone(updatedVendor.getPhone());
+	    Vendor currentVendor = extractVendorFromToken(authorizationHeader);
+//        CustomVendorDetails customVendorDetails = (CustomVendorDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+//        Vendor currentVendor = customVendorDetails.getVendor();
+	    // Update only non-null fields
+	    if (updatedVendor.getUsername() != null) {
+	        currentVendor.setUsername(updatedVendor.getUsername());
+	    }
+	    if (updatedVendor.getAddress() != null) {
+	        currentVendor.setAddress(updatedVendor.getAddress());
+	        // Update geo-coordinates if the address changes
+	        double[] coordinates = geoLocationService.getCoordinates(updatedVendor.getAddress());
+	        if (coordinates != null) {
+	            currentVendor.setLatitude(coordinates[0]);
+	            currentVendor.setLongitude(coordinates[1]);
+	        }
+	    }
+	    if (updatedVendor.getPhone() != null) {
+	        currentVendor.setPhone(updatedVendor.getPhone());
+	    }
+	    if (updatedVendor.getPassword() != null) {
+	        currentVendor.setPassword(passwordEncoder.encode(updatedVendor.getPassword()));
+	    }
+	    if (updatedVendor.getRole() != null) {
+	        currentVendor.setRole(updatedVendor.getRole());
+	    }
+	    if (updatedVendor.getStatus() != null) {
+	        currentVendor.setStatus(updatedVendor.getStatus());
+	    }
+	    if (updatedVendor.getBusinessType() != null) {
+	        currentVendor.setBusinessType(updatedVendor.getBusinessType());
+	    }
+	    if (updatedVendor.getOperatingHours() != null) {
+	        currentVendor.setOperatingHours(updatedVendor.getOperatingHours());
+	    }
+	    if (updatedVendor.getSurplusFoodDetails() != null) {
+	        currentVendor.setSurplusFoodDetails(updatedVendor.getSurplusFoodDetails());
+	    }
+	    if (updatedVendor.getPickupStartTime() != null) {
+	        currentVendor.setPickupStartTime(updatedVendor.getPickupStartTime());
+	    }
+	    if (updatedVendor.getPickupEndTime() != null) {
+	        currentVendor.setPickupEndTime(updatedVendor.getPickupEndTime());
+	    }
+	    if (updatedVendor.getPricingInfo() != null) {
+	        currentVendor.setPricingInfo(updatedVendor.getPricingInfo());
+	    }
+	    if (updatedVendor.getEnvironmentalCertifications() != null) {
+	        currentVendor.setEnvironmentalCertifications(updatedVendor.getEnvironmentalCertifications());
+	    }
+	    if (updatedVendor.getAverageRating() != 0) { // Check for non-zero default values for numeric fields
+	        currentVendor.setAverageRating(updatedVendor.getAverageRating());
+	    }
+	    if (updatedVendor.getReviewsCount() != 0) { // Same for integer fields
+	        currentVendor.setReviewsCount(updatedVendor.getReviewsCount());
+	    }
+	    if (updatedVendor.getImageUrl() != null) {
+	        currentVendor.setImageUrl(updatedVendor.getImageUrl());
+	    }
+	    if (updatedVendor.getZipCode() != null) {
+	        currentVendor.setZipCode(updatedVendor.getZipCode());
+	    }
+        
         vendorRepository.save(currentVendor);
         
         //Creating an event that will be utilized by authorization-service
         eventPublisher.publishUpdateVendorProfileEvent(new UpdateVendorProfileEvent(currentVendor.getUsername(), currentVendor.getEmail(), currentVendor.getPassword(), currentVendor.getRole(), currentVendor.getStatus()));
-        
+        //updating all the details an offer gets from the vendor
+        eventPublisher.publishOfferRelatedVendorDetailsEvent(new OfferRelatedVendorDetailsEvent(currentVendor.getId(), currentVendor.getAddress(), currentVendor.getZipCode(), currentVendor.getLatitude(), currentVendor.getLongitude(), currentVendor.getBusinessType(),currentVendor.getPickupStartTime(), currentVendor.getPickupEndTime(),currentVendor.getReviewsCount()));
+        logoutAndInvalidateToken(authorizationHeader.substring(7));
     }
 
 
@@ -241,8 +322,7 @@ public class VendorService {
 	
     // Method to delete an admin (restricted to Super-Admin)
     public void deleteAdminById(Long id) {
-        Vendor admin = vendorRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Admin not found"));
+        Vendor admin = findVendorById(id);
 
         // Prevent deleting Super-Admin
         if (admin.getRole() == Role.SUPER_ADMIN) {
@@ -264,6 +344,14 @@ public class VendorService {
         vendor.setPassword(passwordEncoder.encode(vendor.getPassword()));
         vendor.setRole(isAdmin ? Role.ADMIN : Role.VENDOR);  // Set role based on input
         vendor.setStatus(Status.INACTIVE);  // Inactive until verified
+        
+        // Fetch and assign geo-coordinates
+        double[] coordinates = geoLocationService.getCoordinates(vendor.getAddress());
+        if (coordinates != null) {
+            vendor.setLatitude(coordinates[0]);
+            vendor.setLongitude(coordinates[1]);
+        }
+        
         vendorRepository.save(vendor);
 
       // Generate verification token
@@ -286,8 +374,7 @@ public class VendorService {
 
     // Promote existing vendor to admin
     public void promoteVendorToAdmin(Long vendorId) {
-        Vendor vendor = vendorRepository.findById(vendorId)
-                .orElseThrow(() -> new RuntimeException("Vendor not found"));
+        Vendor vendor = findVendorById(vendorId);
 
         // Check if the vendor is already an admin
         if (vendor.getRole() == Role.ADMIN || vendor.getRole() == Role.SUPER_ADMIN) {
@@ -308,16 +395,14 @@ public class VendorService {
 	}
 
     public boolean toggleVendorActivation(Long id) {
-        Vendor vendor = vendorRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Vendor not found"));
+        Vendor vendor = findVendorById(id);
         vendor.setStatus(vendor.getStatus() == Status.ACTIVE ? Status.INACTIVE : Status.ACTIVE);
         vendorRepository.save(vendor);
         return vendor.isActive();
     }
 
     public void deleteVendorById(Long id) {
-        Vendor vendor = vendorRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Vendor not found"));
+        Vendor vendor = findVendorById(id);
 
         // Only allow deletion of vendors with the VENDOR role
         if (vendor.getRole() != Role.VENDOR) {
@@ -331,8 +416,7 @@ public class VendorService {
 
     // Method to activate a vendor
     public boolean activateVendor(Long id) {
-        Vendor vendor = vendorRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Vendor not found"));
+        Vendor vendor = findVendorById(id);
         vendor.setStatus(Status.ACTIVE); // Set active to true
         vendorRepository.save(vendor);
         return vendor.isActive();
@@ -340,16 +424,14 @@ public class VendorService {
 
     // Method to deactivate a vendor
     public boolean deactivateVendor(Long id) {
-        Vendor vendor = vendorRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Vendor not found"));
+        Vendor vendor = findVendorById(id);
         vendor.setStatus(Status.INACTIVE); // Set active to false
         vendorRepository.save(vendor);
         return !vendor.isActive();
     }
     
     public void demoteVendorFromAdmin(Long id) {
-        Vendor vendor = vendorRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Vendor not found"));
+        Vendor vendor = findVendorById(id);
 
         if (vendor.getRole() != Role.ADMIN) {
             throw new IllegalArgumentException("This vendor is not an admin.");
@@ -359,9 +441,8 @@ public class VendorService {
         vendor.setRole(Role.VENDOR);
         vendorRepository.save(vendor);
     }
-
-    @CacheEvict(value = "vendor", allEntries = true)
-	public ResponseEntity<String> deleteVendorProfile(String authorizationHeader) {
+    
+    private Vendor extractVendorFromToken(String authorizationHeader) {
 	    if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
 	        throw new RuntimeException("Invalid Authorization header");
 	    }
@@ -375,7 +456,15 @@ public class VendorService {
 	        throw new RuntimeException("Vendor not found in cache");
 	    }
 
-	    Vendor vendor = cachedVendor.get();
+	    return cachedVendor.get();
+    }
+
+    @CacheEvict(value = "vendor", allEntries = true)
+	public ResponseEntity<String> deleteVendorProfile(String authorizationHeader) {
+
+	    String jwt = authorizationHeader.substring(7); // Remove "Bearer " prefix
+
+	    Vendor vendor = extractVendorFromToken(authorizationHeader);
 
 	    // Mark the user as deleted
 	    vendor.setStatus(Status.DELETED);
@@ -383,7 +472,40 @@ public class VendorService {
         //obavesti auth servis da je status promenjen. tamo ga isto setuj kao deleted. takodje u auth servisu bleklistuj token
 	    eventPublisher.publishUpdateVendorProfileEvent(new UpdateVendorProfileEvent(vendor.getUsername(), vendor.getEmail(), vendor.getPassword(), vendor.getRole(), vendor.getStatus()));
 	    eventPublisher.publishTokenInvalidationRequest(new TokenRequestEvent(jwt, null));
+	    eventPublisher.invalidateAllOffers(new AllOffersInvalidationEvent(vendor.getId()));
         return ResponseEntity.ok("Vendor deleted successfully");
+	}
+
+	public void createOffer(String authorizationHeader, OfferDto request) {
+		Vendor vendor = extractVendorFromToken(authorizationHeader);
+
+		OfferCreationEvent event = new OfferCreationEvent(vendor.getId(), request.getName(), request.getDescription(), request.getPrice(), request.getOriginalPrice(), request.getQuantityAvailable(), vendor.getAddress(), vendor.getZipCode(), vendor.getLatitude(), vendor.getLongitude(), 
+				vendor.getBusinessType(), request.getDietaryInfo(), request.getAllergenInfo(), vendor.getPickupStartTime(), vendor.getPickupEndTime(), request.getImageUrl(), request.getRating(), request.getReviewsCount(), request.getExpirationDate());
+		eventPublisher.publishOfferCreationEvent(event);
+		
+	}
+
+	public List<OfferDto> getActiveOffersForVendor(String authorizationHeader) {
+		return offerClient.getActiveOffersForVendor(extractVendorFromToken(authorizationHeader).getId());
+	}
+	
+	public List<OfferDto> getAllOffersForVendor(String authorizationHeader) {
+		return offerClient.getAllOffersForVendor(extractVendorFromToken(authorizationHeader).getId());
+	}
+
+	public void invalidateOffer(int offerId) {
+		eventPublisher.publishOfferInvalidationEvent(new OfferInvalidationEvent(offerId));
+		
+	}
+
+	public void updateOffer(String authorizationHeader, int offerId, OfferDto request) {
+		     
+		Vendor vendor = extractVendorFromToken(authorizationHeader);
+		OfferUpdateEvent event = new OfferUpdateEvent(offerId, vendor.getId(), request.getName(), request.getDescription(), request.getPrice(), request.getOriginalPrice(), 
+				request.getQuantityAvailable(), vendor.getAddress(), vendor.getZipCode(), vendor.getLatitude(), vendor.getLongitude(), vendor.getBusinessType(), request.getDietaryInfo(), 
+				request.getAllergenInfo(), vendor.getPickupStartTime(), vendor.getPickupEndTime(), request.getImageUrl(), request.getRating(), vendor.getReviewsCount(), request.getExpirationDate());
+		eventPublisher.publishUpdateOfferEvent(event);
+		//vendor.getId(), vendor.getAddress(), vendor.getZipCode(), vendor.getLatitude(), vendor.getLongitude(), vendor.getBusinessType(),vendor.getPickupStartTime(), vendor.getPickupEndTime(),vendor.getReviewsCount()
 	}
 
 }

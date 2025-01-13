@@ -6,7 +6,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+import com.stillfresh.app.sharedentities.offer.events.AllOffersInvalidationEvent;
+import com.stillfresh.app.sharedentities.offer.events.OfferCreationEvent;
+import com.stillfresh.app.sharedentities.offer.events.OfferInvalidationEvent;
+import com.stillfresh.app.sharedentities.offer.events.OfferUpdateEvent;
 import com.stillfresh.app.sharedentities.shared.events.TokenRequestEvent;
+import com.stillfresh.app.sharedentities.vendor.events.OfferRelatedVendorDetailsEvent;
 import com.stillfresh.app.sharedentities.vendor.events.UpdateVendorProfileEvent;
 import com.stillfresh.app.sharedentities.vendor.events.VendorRegisteredEvent;
 import com.stillfresh.app.sharedentities.vendor.events.VendorVerifiedEvent;
@@ -30,7 +35,23 @@ public class VendorEventPublisher {
     
     @Value("${authorization.topic.name:token-invalidation-request}")
     private String tokenInvalidationRequestTopic;
+    
+    //-------offer topics--------
+    @Value("${kafka.topic.offer-created:offer-created}")
+    private String offerCreationTopic;
+    
+    @Value("${kafka.topic.offer-invalidated:offer-invalidated}")
+    private String offerInvalidateTopic;
 
+    @Value("${kafka.topic.all-offers-invalidated:all-offers-invalidated}")
+    private String allOffersInvalidationTopic;
+    
+    @Value("${kafka.topic.update-offer:update-offer}")
+    private String updateOfferTopic;
+    
+    @Value("${kafka.topic.update-vendor-related-offer-details:update-vendor-related-offer-details}")
+    private String updateVendorRelatedOfferDetailsTopic;
+    
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     public VendorEventPublisher(KafkaTemplate<String, Object> kafkaTemplate) {
@@ -81,6 +102,53 @@ public class VendorEventPublisher {
             kafkaTemplate.send(tokenInvalidationRequestTopic, event);
         } catch (Exception e) {
             logger.error("Failed to publish TokenValidationEvent to Kafka", e);
+        }
+		
+	}
+	
+    public void publishOfferCreationEvent(OfferCreationEvent event) {
+        try {
+            logger.info("Publishing OfferCreationEvent to Kafka topic '{}': {}", offerCreationTopic, event);
+            kafkaTemplate.send(offerCreationTopic, event);
+        } catch (Exception e) {
+            logger.error("Failed to publish OfferCreationEvent to Kafka", e);
+        }
+    }
+    
+    public void publishOfferInvalidationEvent(OfferInvalidationEvent event) {
+        try {
+            logger.info("Publishing OfferInvalidationEvent to Kafka topic '{}': {}", offerInvalidateTopic, event);
+            kafkaTemplate.send(offerInvalidateTopic, event);
+        } catch (Exception e) {
+            logger.error("Failed to publish OfferInvalidationEvent to Kafka", e);
+        }
+    }
+
+	public void invalidateAllOffers(AllOffersInvalidationEvent event) {
+        try {
+            logger.info("Publishing AllOffersInvalidationEvent to Kafka topic '{}': {}", allOffersInvalidationTopic, event);
+            kafkaTemplate.send(allOffersInvalidationTopic, event);
+        } catch (Exception e) {
+            logger.error("Failed to publish AllOffersInvalidationEvent to Kafka", e);
+        }
+		
+	}
+
+	public void publishUpdateOfferEvent(OfferUpdateEvent event) {
+        try {
+            logger.info("Publishing OfferUpdateEvent to Kafka topic '{}': {}", updateOfferTopic, event);
+            kafkaTemplate.send(updateOfferTopic, event);
+        } catch (Exception e) {
+            logger.error("Failed to publish OfferUpdateEvent to Kafka", e);
+        }
+	}
+
+	public void publishOfferRelatedVendorDetailsEvent(OfferRelatedVendorDetailsEvent event) {
+        try {
+            logger.info("Publishing OfferRelatedVendorDetailsEvent to Kafka topic '{}': {}", updateVendorRelatedOfferDetailsTopic, event);
+            kafkaTemplate.send(updateVendorRelatedOfferDetailsTopic, event);
+        } catch (Exception e) {
+            logger.error("Failed to publish OfferRelatedVendorDetailsEvent to Kafka", e);
         }
 		
 	}

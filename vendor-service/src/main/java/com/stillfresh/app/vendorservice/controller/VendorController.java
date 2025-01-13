@@ -2,6 +2,9 @@ package com.stillfresh.app.vendorservice.controller;
 
 import com.stillfresh.app.vendorservice.client.AuthorizationServiceClient;
 import com.stillfresh.app.sharedentities.dto.CheckAvailabilityRequest;
+import com.stillfresh.app.sharedentities.offer.events.OfferCreationEvent;
+import com.stillfresh.app.sharedentities.offer.events.OfferUpdateEvent;
+import com.stillfresh.app.sharedentities.dto.OfferDto;
 import com.stillfresh.app.sharedentities.responses.ApiResponse;
 import com.stillfresh.app.sharedentities.responses.ErrorResponse;
 import com.stillfresh.app.vendorservice.dto.PasswordChangeRequest;
@@ -23,6 +26,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.util.List;
 
 @RestController
 @RequestMapping("/vendors")
@@ -39,36 +43,29 @@ public class VendorController {
     // Regular vendor registration
     @PostMapping("/register")
     public ResponseEntity<?> registerVendor(@RequestBody Vendor vendor) throws IOException {
-    	
-        // Call the authorization service to check availability
-        ResponseEntity<ApiResponse> availabilityResponse = authorizationServiceClient.checkAvailability(
-            new CheckAvailabilityRequest(vendor.getUsername(), vendor.getEmail()));
-
-        // If the response indicates a conflict (username/email already taken)
-        logger.info("availabilityResponse.getStatusCode()" + availabilityResponse.getStatusCode());
-        logger.info("HttpStatus.CONFLICT" + HttpStatus.CONFLICT);
-        if (availabilityResponse.getStatusCode() == HttpStatus.CONFLICT) {
-            // Return the conflict response
-        	logger.info("PROSLO Check za conflickt");
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(availabilityResponse.getBody());
-        }
-
         try {
-            // If available, proceed to initiate registration
+            // Call the authorization service to check availability
+            ApiResponse availabilityResponse = authorizationServiceClient.checkAvailability(
+                new CheckAvailabilityRequest(vendor.getUsername(), vendor.getEmail()));
+
+            // Check if the username/email is unavailable
+            if (!availabilityResponse.isSuccess()) {
+                logger.info("Availability check failed: {}", availabilityResponse.getMessage());
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(availabilityResponse);
+            }
+
+            // Proceed with registration
             vendorService.registerVendor(vendor);
             return ResponseEntity.ok(new ApiResponse(true, "Vendor registration initiated. Check your email for verification."));
         } catch (Exception ex) {
+            logger.error("Error during vendor registration: {}", ex.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                                  .body(new ErrorResponse("Failed to initiate registration: " + ex.getMessage()));
         }
-    	
-    	
-//        vendorService.registerVendor(vendor, false);  // False indicates normal vendor registration
-//        return ResponseEntity.ok("Vendor registration successful. Please verify your email.");
     }
 
     // Admin registration (can be restricted to other admins using @PreAuthorize)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PostMapping("/register-admin")
     public ResponseEntity<String> registerAdmin(@RequestBody Vendor vendor) throws IOException {
         vendorService.registerVendor(vendor, true);  // True indicates admin registration
@@ -76,7 +73,7 @@ public class VendorController {
     }
 
     // Promote an existing vendor to admin
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PutMapping("/{id}/promote-to-admin")
     public ResponseEntity<String> promoteVendorToAdmin(@PathVariable Long id) {
         vendorService.promoteVendorToAdmin(id);
@@ -111,14 +108,14 @@ public class VendorController {
         return ResponseEntity.ok(user);
     }
     
-    @PutMapping("/profile")
-    public ResponseEntity<String> updateVendorProfile(@Valid @RequestBody Vendor updatedVendor, BindingResult result) {
+    @PutMapping("/update-profile")
+    public ResponseEntity<String> updateVendorProfile(@RequestHeader("Authorization") String token, @Valid @RequestBody Vendor updatedVendor, BindingResult result) {
   
         if (result.hasErrors()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result.getAllErrors().get(0).getDefaultMessage());
         }
-        vendorService.updateVendorProfile(updatedVendor);
-        return ResponseEntity.ok("Vendor profile updated successfully");
+        vendorService.updateVendorProfile(token, updatedVendor);
+        return ResponseEntity.ok("Vendor profile updated successfully. You are logged out.");
     }
     
     @PutMapping("/change-password")
@@ -151,7 +148,37 @@ public class VendorController {
     
     @DeleteMapping("/delete")
     public ResponseEntity<?> deleteVendor(@RequestHeader("Authorization") String token) {
-    	return vendorService.deleteVendorProfile(token);
+    	return vendorService.deleteVendorProfile(token); //ovo mora da obrise i sve offere povezane sa vendorom . da ih deaktivira 
+    }
+    
+    @PostMapping("/offer-create")
+    public ResponseEntity<String> createOffer(@RequestHeader("Authorization") String token, @RequestBody OfferDto request) {
+        vendorService.createOffer(token, request);
+        return ResponseEntity.ok("Offer creation request submitted successfully.");
+    }
+    
+    @GetMapping("/active-offers")
+    public ResponseEntity<List<OfferDto>> getActiveOffersForVendor(@RequestHeader("Authorization") String token) {
+        List<OfferDto> activeOffers = vendorService.getActiveOffersForVendor(token);
+        return ResponseEntity.ok(activeOffers);
+    }
+    
+    @GetMapping("/all-offers")
+    public ResponseEntity<List<OfferDto>> getAllOffersForVendor(@RequestHeader("Authorization") String token) {
+        List<OfferDto> activeOffers = vendorService.getAllOffersForVendor(token);
+        return ResponseEntity.ok(activeOffers);
+    }
+    
+    @PostMapping("/invalidate-offer/{offerId}")
+    public ResponseEntity<String> invalidateOffer(@PathVariable int offerId){
+    	vendorService.invalidateOffer(offerId);
+    	return ResponseEntity.ok("Offer deactivated successfully.");
+    }
+    
+    @PostMapping("/update-offer/{offerId}")
+    public ResponseEntity<String> updateOffer(@RequestHeader("Authorization") String token, @PathVariable int offerId, @RequestBody OfferDto request){
+    	vendorService.updateOffer(token, offerId, request);
+    	return ResponseEntity.ok("Offer updated successfully.");
     }
 
 }

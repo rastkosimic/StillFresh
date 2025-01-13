@@ -3,6 +3,9 @@ package com.stillfresh.app.sharedentities.responses;
 public class ApiResponse {
     private boolean success;
     private String message;
+    
+    public ApiResponse() {
+    }
 
     // Constructor
     public ApiResponse(boolean success, String message) {

@@ -46,5 +46,7 @@
         <module>vendor-service</module>
         <module>authorization-service</module>
         <module>shared-entities</module>
+        <module>order-service</module>
+        <module>offer-service</module>
     </modules>
 </project>
