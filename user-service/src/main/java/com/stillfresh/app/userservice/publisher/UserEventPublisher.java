@@ -2,10 +2,14 @@ package com.stillfresh.app.userservice.publisher;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+import com.stillfresh.app.sharedentities.offer.events.OfferRequestEvent;
+import com.stillfresh.app.sharedentities.order.events.OrderRequestEvent;
+import com.stillfresh.app.sharedentities.payment.events.UpdatePaymentServiceEvent;
 import com.stillfresh.app.sharedentities.shared.events.TokenRequestEvent;
 import com.stillfresh.app.sharedentities.user.events.UpdateUserProfileEvent;
 import com.stillfresh.app.sharedentities.user.events.UserRegisteredEvent;
@@ -30,13 +34,23 @@ public class UserEventPublisher {
     
     @Value("${authorization.topic.name:token-invalidation-request}")
     private String tokenInvaidationRequestTopic;
-
-    private final KafkaTemplate<String, Object> kafkaTemplate;
-
-    public UserEventPublisher(KafkaTemplate<String, Object> kafkaTemplate) {
-        this.kafkaTemplate = kafkaTemplate;
-    }
     
+    //--------offer topics-----------
+    @Value("${offer.topic.offer-request:offer-request}")
+    private String offerRequestTopic;
+    
+    
+    //--------order topics-----------
+    @Value("${order.topic.order-request:order-request}")
+    private String orderRequestTopic;
+    
+    //--------payment topics-----------
+    @Value("${payment.topic.name:payment-service-update}")
+    private String paymentServiceUpdateTopic;
+
+	@Autowired    
+    private KafkaTemplate<String, Object> kafkaTemplate;
+
     public void publishUserRegisteredEvent(UserRegisteredEvent event) {
         try {
         	logger.info("Published UserRegisteredEvent to Kafka topic '{}'", userTopic);
@@ -82,5 +96,39 @@ public class UserEventPublisher {
         } catch (Exception e) {
             logger.error("Failed to publish TokenRequestEvent to Kafka", e);
         }
+	}
+
+	
+	//---------------Offer related events-------------------
+	
+	public void publishOfferRequestEvent(OfferRequestEvent event) {
+        try {
+        	logger.info("Published OfferRequestEvent to Kafka topic '{}'", offerRequestTopic);
+            kafkaTemplate.send(offerRequestTopic, event);
+        } catch (Exception e) {
+            logger.error("Failed to publish OfferRequestEvent to Kafka", e);
+        }
+		
+	}
+
+	//---------------Order related events-------------------
+	public void publishOrderRequestEvent(OrderRequestEvent event) {
+	      try {
+	    	logger.info("Published OrderRequestEvent to Kafka topic '{}'", orderRequestTopic);
+	        kafkaTemplate.send(orderRequestTopic, event);
+	    } catch (Exception e) {
+	        logger.error("Failed to publish OrderRequestEvent to Kafka", e);
+	    }
+		
+	}
+
+	//---------------Payment related events-------------------	
+	public void publishPaymentServiceUpdateEvent(UpdatePaymentServiceEvent event) {
+	      try {
+	    	logger.info("Published UpdatePaymentServiceEvent to Kafka topic '{}'", paymentServiceUpdateTopic);
+	        kafkaTemplate.send(paymentServiceUpdateTopic, event);
+	    } catch (Exception e) {
+	        logger.error("Failed to publish UpdatePaymentServiceEvent to Kafka", e);
+	    }
 	}
 }

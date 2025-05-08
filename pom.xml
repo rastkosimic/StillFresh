@@ -48,5 +48,6 @@
         <module>shared-entities</module>
         <module>order-service</module>
         <module>offer-service</module>
+        <module>payment-service</module>
     </modules>
 </project>

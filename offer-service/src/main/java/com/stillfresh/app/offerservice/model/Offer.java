@@ -17,7 +17,7 @@ public class Offer {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private int id;
+    private Long id;
 
     @Column(nullable = false)
     private Long vendorId;
@@ -25,6 +25,9 @@ public class Offer {
     @Column(nullable = false)
     private String name;
 
+    @Column(nullable = false)
+    private String vendorName;
+    
     @Column(nullable = false)
     private String description;
 
@@ -87,11 +90,11 @@ public class Offer {
         this.createdAt = OffsetDateTime.now(); // Automatically set creation date
     }
 
-	public int getId() {
+	public Long getId() {
 		return id;
 	}
 
-	public void setId(int id) {
+	public void setId(Long id) {
 		this.id = id;
 	}
 
@@ -102,6 +105,14 @@ public class Offer {
 	public void setVendorId(Long vendorId) {
 		this.vendorId = vendorId;
 	}
+	
+    public String getVendorName() {
+        return vendorName;
+    }
+
+    public void setVendorName(String vendorName) {
+        this.vendorName = vendorName;
+    }
 
 	public String getName() {
 		return name;

@@ -4,6 +4,7 @@ import java.time.OffsetDateTime;
 
 public class OfferRelatedVendorDetailsEvent {
     private Long id;
+    private String vendorName;
     private String address;
     private String zipCode;
     private double latitude;
@@ -15,10 +16,11 @@ public class OfferRelatedVendorDetailsEvent {
     
     public OfferRelatedVendorDetailsEvent() {}
 
-    public OfferRelatedVendorDetailsEvent(Long id, String address, String zipCode, double latitude, double longitude,
+    public OfferRelatedVendorDetailsEvent(Long id, String vendorName, String address, String zipCode, double latitude, double longitude,
                                           String businessType, OffsetDateTime pickupStartTime, OffsetDateTime pickupEndTime,
                                           int reviewsCount) {
         this.id = id;
+        this.vendorName = vendorName;
         this.address = address;
         this.zipCode = zipCode;
         this.latitude = latitude;
@@ -37,7 +39,15 @@ public class OfferRelatedVendorDetailsEvent {
     public void setId(Long id) {
         this.id = id;
     }
+    
+    public String getVendorName() {
+        return vendorName;
+    }
 
+    public void setVendorName(String vendorName) {
+        this.vendorName = vendorName;
+    }
+    
     public String getAddress() {
         return address;
     }

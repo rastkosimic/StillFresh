@@ -21,10 +21,10 @@ public class CachingLoggedUserListener {
 
     @KafkaListener(topics = "${user.topic.name:cache-logged-user}", groupId = "authorization-group")
     public void handleUserCaching(LoggedUserEvent event) {
-        logger.debug("Received LoggedUserEvent: {}", event);
+        logger.info("Received LoggedUserEvent: {}", event);
         try {
             userService.cacheUserOnLogin(event.getEmail());
-            logger.debug("LoggedUserEvent processed successfully for email: {}", event.getEmail());
+            logger.info("LoggedUserEvent processed successfully for email: {}", event.getEmail());
         } catch (Exception e) {
             logger.error("Failed to process LoggedUserEvent for email: {}", event.getEmail(), e);
         }

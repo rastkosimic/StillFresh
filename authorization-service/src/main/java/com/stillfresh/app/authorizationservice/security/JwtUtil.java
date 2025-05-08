@@ -4,6 +4,9 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
@@ -17,6 +20,8 @@ import java.util.function.Function;
 
 @Component
 public class JwtUtil {
+	
+	private static final Logger logger = LoggerFactory.getLogger(JwtUtil.class);
 
     private final SecretKey secretKey;
     private final long tokenValidity = 1000 * 60 * 15;  // 15 minutes
@@ -68,6 +73,7 @@ public class JwtUtil {
         Map<String, Object> claims = new HashMap<>();
         return createToken(claims, 
             customUserDetails.getUsername(), 
+            customUserDetails.getUser().getId(),
             customUserDetails.getUser().getEmail(), 
             customUserDetails.getUser().getRole().name(), 
             tokenValidity
@@ -80,6 +86,7 @@ public class JwtUtil {
         Map<String, Object> claims = new HashMap<>();
         return createToken(claims, 
             customUserDetails.getUsername(), 
+            customUserDetails.getUser().getId(),
             customUserDetails.getUser().getEmail(), 
             customUserDetails.getUser().getRole().name(), 
             refreshTokenValidity
@@ -87,16 +94,27 @@ public class JwtUtil {
     }
 
     // Create a token with claims
-    private String createToken(Map<String, Object> claims, String subject, String email, String role, long validity) {
-        return Jwts.builder()
-                .setClaims(claims)
-                .setSubject(subject)
-                .claim("email", email)  // Add email to claims
-                .claim("role", role)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + validity))
-                .signWith(secretKey, SignatureAlgorithm.HS256)
-                .compact();
+    private String createToken(Map<String, Object> claims, String subject, Long userId, String email, String role, long validity) {
+        try {
+            logger.info("Creating JWT token for userId: {}, email: {}, role: {}, validity: {} ms", userId, email, role, validity);
+            
+            String token = Jwts.builder()
+                    .setClaims(claims)
+                    .setSubject(subject)
+                    .claim("userId", userId)
+                    .claim("email", email)  // Add email to claims
+                    .claim("role", role)
+                    .setIssuedAt(new Date())
+                    .setExpiration(new Date(System.currentTimeMillis() + validity))
+                    .signWith(secretKey, SignatureAlgorithm.HS256)
+                    .compact();
+
+            logger.debug("JWT token created successfully: {}", token);
+            return token;
+        } catch (Exception e) {
+            logger.error("Error creating JWT token for userId: {}", userId, e);
+            throw new RuntimeException("Failed to generate JWT token");
+        }
     }
 
     // Validate token against user details

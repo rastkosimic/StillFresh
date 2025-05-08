@@ -36,7 +36,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/auth/login", "/auth/register", "/auth/verify", "/auth/forgot-password", "/auth/reset-password", "/auth/refresh-token", "/admin/create-initial-admin", "/auth/check-availability").permitAll()  // Open endpoints for authentication
+                .requestMatchers("/auth/login", "/auth/register", "/auth/verify", "/auth/forgot-password", "/auth/reset-password", "/auth/refresh-token", "/admin/create-initial-admin", "/auth/check-availability", "/v3/api-docs/**", "/swagger-ui/**").permitAll()  // Open endpoints for authentication
                 .requestMatchers("/admin/**").hasRole("ADMIN")  // Restrict admin routes to ADMIN role
                 .anyRequest().authenticated()  // Any other request requires authentication
             )

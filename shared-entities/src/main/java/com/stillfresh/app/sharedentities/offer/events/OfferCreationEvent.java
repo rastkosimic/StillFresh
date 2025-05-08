@@ -7,6 +7,7 @@ public class OfferCreationEvent {
 
     private Long vendorId;
     private String name;
+    private String vendorName;
     private String description;
     private double price;
     private double originalPrice;
@@ -28,12 +29,13 @@ public class OfferCreationEvent {
     public OfferCreationEvent() {
     }
 
-	public OfferCreationEvent(Long vendorId, String name, String description, double price, double originalPrice,
+	public OfferCreationEvent(Long vendorId, String vendorName, String name, String description, double price, double originalPrice,
 			int quantityAvailable, String address, String zipCode, double latitude, double longitude, String businessType,
 			String dietaryInfo, String allergenInfo, OffsetDateTime pickupStartTime, OffsetDateTime pickupEndTime,
 			String imageUrl, double rating, int reviewsCount, OffsetDateTime expirationDate) {
 		super();
 		this.vendorId = vendorId;
+		this.vendorName = vendorName;
 		this.name = name;
 		this.description = description;
 		this.price = price;
@@ -61,7 +63,14 @@ public class OfferCreationEvent {
 	public void setVendorId(Long vendorId) {
 		this.vendorId = vendorId;
 	}
+	
+    public String getVendorName() {
+        return vendorName;
+    }
 
+    public void setVendorName(String vendorName) {
+        this.vendorName = vendorName;
+    }
 	public String getName() {
 		return name;
 	}

@@ -274,7 +274,7 @@ public class VendorService {
         //Creating an event that will be utilized by authorization-service
         eventPublisher.publishUpdateVendorProfileEvent(new UpdateVendorProfileEvent(currentVendor.getUsername(), currentVendor.getEmail(), currentVendor.getPassword(), currentVendor.getRole(), currentVendor.getStatus()));
         //updating all the details an offer gets from the vendor
-        eventPublisher.publishOfferRelatedVendorDetailsEvent(new OfferRelatedVendorDetailsEvent(currentVendor.getId(), currentVendor.getAddress(), currentVendor.getZipCode(), currentVendor.getLatitude(), currentVendor.getLongitude(), currentVendor.getBusinessType(),currentVendor.getPickupStartTime(), currentVendor.getPickupEndTime(),currentVendor.getReviewsCount()));
+        eventPublisher.publishOfferRelatedVendorDetailsEvent(new OfferRelatedVendorDetailsEvent(currentVendor.getId(), currentVendor.getUsername(), currentVendor.getAddress(), currentVendor.getZipCode(), currentVendor.getLatitude(), currentVendor.getLongitude(), currentVendor.getBusinessType(),currentVendor.getPickupStartTime(), currentVendor.getPickupEndTime(),currentVendor.getReviewsCount()));
         logoutAndInvalidateToken(authorizationHeader.substring(7));
     }
 
@@ -479,7 +479,7 @@ public class VendorService {
 	public void createOffer(String authorizationHeader, OfferDto request) {
 		Vendor vendor = extractVendorFromToken(authorizationHeader);
 
-		OfferCreationEvent event = new OfferCreationEvent(vendor.getId(), request.getName(), request.getDescription(), request.getPrice(), request.getOriginalPrice(), request.getQuantityAvailable(), vendor.getAddress(), vendor.getZipCode(), vendor.getLatitude(), vendor.getLongitude(), 
+		OfferCreationEvent event = new OfferCreationEvent(vendor.getId(), vendor.getUsername(),request.getName(), request.getDescription(), request.getPrice(), request.getOriginalPrice(), request.getQuantityAvailable(), vendor.getAddress(), vendor.getZipCode(), vendor.getLatitude(), vendor.getLongitude(), 
 				vendor.getBusinessType(), request.getDietaryInfo(), request.getAllergenInfo(), vendor.getPickupStartTime(), vendor.getPickupEndTime(), request.getImageUrl(), request.getRating(), request.getReviewsCount(), request.getExpirationDate());
 		eventPublisher.publishOfferCreationEvent(event);
 		
@@ -498,14 +498,16 @@ public class VendorService {
 		
 	}
 
-	public void updateOffer(String authorizationHeader, int offerId, OfferDto request) {
+	public void updateOffer(String authorizationHeader, Long offerId, OfferDto request) {
 		     
 		Vendor vendor = extractVendorFromToken(authorizationHeader);
-		OfferUpdateEvent event = new OfferUpdateEvent(offerId, vendor.getId(), request.getName(), request.getDescription(), request.getPrice(), request.getOriginalPrice(), 
-				request.getQuantityAvailable(), vendor.getAddress(), vendor.getZipCode(), vendor.getLatitude(), vendor.getLongitude(), vendor.getBusinessType(), request.getDietaryInfo(), 
-				request.getAllergenInfo(), vendor.getPickupStartTime(), vendor.getPickupEndTime(), request.getImageUrl(), request.getRating(), vendor.getReviewsCount(), request.getExpirationDate());
+		OfferDto offerDto = new OfferDto(offerId, vendor.getUsername(), request.getName(), request.getDescription(), request.getPrice(), request.getOriginalPrice(), 
+				request.getQuantityAvailable(), request.getDietaryInfo(), request.getAllergenInfo(), request.getImageUrl(), request.getRating(), 
+				vendor.getReviewsCount(), request.getExpirationDate(), true, request.getCreatedAt(), vendor.getAddress(), vendor.getZipCode(), 
+				vendor.getLatitude(), vendor.getLongitude(), vendor.getBusinessType(), vendor.getPickupStartTime(), vendor.getPickupEndTime());
+		
+		OfferUpdateEvent event = new OfferUpdateEvent(vendor.getId(), offerDto);
 		eventPublisher.publishUpdateOfferEvent(event);
-		//vendor.getId(), vendor.getAddress(), vendor.getZipCode(), vendor.getLatitude(), vendor.getLongitude(), vendor.getBusinessType(),vendor.getPickupStartTime(), vendor.getPickupEndTime(),vendor.getReviewsCount()
 	}
 
 }

@@ -5,6 +5,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Component;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 
@@ -37,6 +38,11 @@ public class JwtUtil {
     public String extractEmail(String token) {
         return extractClaim(token, claims -> claims.get("email", String.class));
     }
+    
+    public Long extractUserId(String token) {
+        return extractClaim(token, claims -> claims.get("userId", Long.class));
+    }
+
 
     // Extract expiration date from token
     public Date extractExpiration(String token) {
@@ -69,6 +75,7 @@ public class JwtUtil {
         Map<String, Object> claims = new HashMap<>();
         return createToken(claims, 
             customUserDetails.getUsername(), 
+            customUserDetails.getUser().getId(),
             customUserDetails.getUser().getEmail(), 
             customUserDetails.getUser().getRole().name(), 
             tokenValidity
@@ -81,6 +88,7 @@ public class JwtUtil {
         Map<String, Object> claims = new HashMap<>();
         return createToken(claims, 
             customUserDetails.getUsername(), 
+            customUserDetails.getUser().getId(),
             customUserDetails.getUser().getEmail(), 
             customUserDetails.getUser().getRole().name(), 
             refreshTokenValidity
@@ -88,10 +96,11 @@ public class JwtUtil {
     }
 
     // Create a token with claims
-    private String createToken(Map<String, Object> claims, String subject, String email, String role, long validity) {
+    private String createToken(Map<String, Object> claims, String subject, Long userId, String email, String role, long validity) {
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(subject)
+                .claim("userId", userId)
                 .claim("email", email)  // Add email to claims
                 .claim("role", role)
                 .setIssuedAt(new Date())

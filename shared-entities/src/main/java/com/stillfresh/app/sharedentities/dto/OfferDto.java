@@ -10,7 +10,9 @@ public class OfferDto implements Serializable{
     
 	private static final long serialVersionUID = 1L;
 
-	private int id;  // Offer ID for reference
+	private Long id;  // Offer ID for reference
+	
+	private String vendorName;
 
     private String name;  // Offer name/title
     
@@ -38,12 +40,31 @@ public class OfferDto implements Serializable{
     
     private OffsetDateTime createdAt;
     
-    public OfferDto() {}
+	private String address;  // Address of the offer location
+	
+	private String zipCode;  // Zip code for approximate searches
+	
+	private double latitude;  // Precise latitude for geo-location
+	
+	private double longitude;  // Precise longitude for geo-location
+	
+	private String businessType;  // Type of business associated with the offer
+	
+	private OffsetDateTime pickupStartTime;  // Start time for offer pickup
+	
+	private OffsetDateTime pickupEndTime;  // End time for offer pickup
+    
+    public OfferDto() {}   
+    
 
-    public OfferDto(int id, String name, String description, double price, double originalPrice, int quantityAvailable,
+	public OfferDto(Long id, String vendorName, String name, String description, double price, double originalPrice, int quantityAvailable,
 			String dietaryInfo, String allergenInfo, String imageUrl, double rating, int reviewsCount,
-			OffsetDateTime expirationDate, boolean active, OffsetDateTime createdAt) {
+			OffsetDateTime expirationDate, boolean active, OffsetDateTime createdAt, String address, String zipCode,
+			double latitude, double longitude, String businessType, OffsetDateTime pickupStartTime,
+			OffsetDateTime pickupEndTime) {
+		super();
 		this.id = id;
+		this.vendorName = vendorName;
 		this.name = name;
 		this.description = description;
 		this.price = price;
@@ -57,18 +78,33 @@ public class OfferDto implements Serializable{
 		this.expirationDate = expirationDate;
 		this.active = active;
 		this.createdAt = createdAt;
+		this.address = address;
+		this.zipCode = zipCode;
+		this.latitude = latitude;
+		this.longitude = longitude;
+		this.businessType = businessType;
+		this.pickupStartTime = pickupStartTime;
+		this.pickupEndTime = pickupEndTime;
 	}
 
 	// Getters and setters
 
-    public int getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(int id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
+    public String getVendorName() {
+        return vendorName;
+    }
+
+    public void setVendorName(String vendorName) {
+        this.vendorName = vendorName;
+    }
+    
     public String getName() {
         return name;
     }
@@ -171,6 +207,66 @@ public class OfferDto implements Serializable{
 
 	public void setCreatedAt(OffsetDateTime createdAt) {
 		this.createdAt = createdAt;
+	}
+
+	public String getAddress() {
+		return address;
+	}
+
+	public void setAddress(String address) {
+		this.address = address;
+	}
+
+	public String getZipCode() {
+		return zipCode;
+	}
+
+	public void setZipCode(String zipCode) {
+		this.zipCode = zipCode;
+	}
+
+	public double getLatitude() {
+		return latitude;
+	}
+
+	public void setLatitude(double latitude) {
+		this.latitude = latitude;
+	}
+
+	public double getLongitude() {
+		return longitude;
+	}
+
+	public void setLongitude(double longitude) {
+		this.longitude = longitude;
+	}
+
+	public String getBusinessType() {
+		return businessType;
+	}
+
+	public void setBusinessType(String businessType) {
+		this.businessType = businessType;
+	}
+
+	public OffsetDateTime getPickupStartTime() {
+		return pickupStartTime;
+	}
+
+	public void setPickupStartTime(OffsetDateTime pickupStartTime) {
+		this.pickupStartTime = pickupStartTime;
+	}
+
+	public OffsetDateTime getPickupEndTime() {
+		return pickupEndTime;
+	}
+
+	public void setPickupEndTime(OffsetDateTime pickupEndTime) {
+		this.pickupEndTime = pickupEndTime;
+	}
+
+	public static long getSerialversionuid() {
+		return serialVersionUID;
 	}
     
     

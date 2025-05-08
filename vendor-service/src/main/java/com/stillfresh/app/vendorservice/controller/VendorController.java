@@ -28,8 +28,17 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.util.List;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+
 @RestController
 @RequestMapping("/vendors")
+@Tag(name = "Vendor Management", description = "APIs for managing vendor accounts, profiles, and offers")
 public class VendorController {
 
 	private static final Logger logger = LoggerFactory.getLogger(VendorController.class);
@@ -40,7 +49,15 @@ public class VendorController {
     @Autowired
     private AuthorizationServiceClient authorizationServiceClient;
     
-    // Regular vendor registration
+    @Operation(
+        summary = "Register a new vendor",
+        description = "Creates a new vendor account and sends a verification email. The vendor must verify their email before they can log in."
+    )
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Registration initiated successfully"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Username or email already exists"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error")
+    })
     @PostMapping("/register")
     public ResponseEntity<?> registerVendor(@RequestBody Vendor vendor) throws IOException {
         try {
@@ -64,7 +81,11 @@ public class VendorController {
         }
     }
 
-    // Admin registration (can be restricted to other admins using @PreAuthorize)
+    @Operation(
+        summary = "Register a new admin",
+        description = "Creates a new admin account. This endpoint is restricted to existing admins and super admins."
+    )
+    @SecurityRequirement(name = "bearerAuth")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PostMapping("/register-admin")
     public ResponseEntity<String> registerAdmin(@RequestBody Vendor vendor) throws IOException {
@@ -72,16 +93,30 @@ public class VendorController {
         return ResponseEntity.ok("Admin registration successful. Please verify your email.");
     }
 
-    // Promote an existing vendor to admin
+    @Operation(
+        summary = "Promote vendor to admin",
+        description = "Promotes an existing vendor to admin role. This endpoint is restricted to existing admins and super admins."
+    )
+    @SecurityRequirement(name = "bearerAuth")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PutMapping("/{id}/promote-to-admin")
-    public ResponseEntity<String> promoteVendorToAdmin(@PathVariable Long id) {
+    public ResponseEntity<String> promoteVendorToAdmin(
+        @Parameter(description = "ID of the vendor to promote") @PathVariable Long id) {
         vendorService.promoteVendorToAdmin(id);
         return ResponseEntity.ok("Vendor promoted to admin successfully");
     }
 
+    @Operation(
+        summary = "Verify vendor email",
+        description = "Verifies a vendor's email address using the token sent during registration."
+    )
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Email verified successfully"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid verification token")
+    })
     @GetMapping("/verify")
-    public ResponseEntity<String> verifyVendor(@RequestParam("token") String token) {
+    public ResponseEntity<String> verifyVendor(
+        @Parameter(description = "Verification token sent via email") @RequestParam("token") String token) {
         boolean isVerified = vendorService.verifyVendor(token);
         if (isVerified) {
             return ResponseEntity.ok("Vendor verified successfully.");
@@ -90,26 +125,54 @@ public class VendorController {
         }
     }
     
+    @Operation(
+        summary = "Request password reset",
+        description = "Initiates the password reset process by sending a reset link to the vendor's email."
+    )
     @PostMapping("/forgot-password")
-    public ResponseEntity<String> forgotPassword(@RequestParam String email) throws IOException {
+    public ResponseEntity<String> forgotPassword(
+        @Parameter(description = "Vendor's email address") @RequestParam String email) throws IOException {
         vendorService.sendPasswordResetLink(email);
         return ResponseEntity.ok("Password reset link sent to your email");
     }
 
+    @Operation(
+        summary = "Reset password",
+        description = "Resets the vendor's password using the token received via email."
+    )
     @PostMapping("/reset-password")
-    public ResponseEntity<String> resetPassword(@RequestParam("token") String token, @RequestBody String newPassword) {
+    public ResponseEntity<String> resetPassword(
+        @Parameter(description = "Password reset token") @RequestParam("token") String token,
+        @Parameter(description = "New password") @RequestBody String newPassword) {
         vendorService.resetPassword(token, newPassword);
         return ResponseEntity.ok("Password reset successfully");
     }
     
+    @Operation(
+        summary = "Get vendor by ID",
+        description = "Retrieves vendor information by their ID."
+    )
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Vendor found successfully"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Vendor not found")
+    })
     @GetMapping("/{id}")
-    public ResponseEntity<Vendor> getVendorById(@PathVariable Long id) {
+    public ResponseEntity<Vendor> getVendorById(
+        @Parameter(description = "Vendor ID") @PathVariable Long id) {
     	Vendor user = vendorService.findVendorById(id);
         return ResponseEntity.ok(user);
     }
     
+    @Operation(
+        summary = "Update vendor profile",
+        description = "Updates the vendor's profile information. Requires authentication and logs out the user after successful update."
+    )
+    @SecurityRequirement(name = "bearerAuth")
     @PutMapping("/update-profile")
-    public ResponseEntity<String> updateVendorProfile(@RequestHeader("Authorization") String token, @Valid @RequestBody Vendor updatedVendor, BindingResult result) {
+    public ResponseEntity<String> updateVendorProfile(
+        @Parameter(description = "JWT token") @RequestHeader("Authorization") String token,
+        @Valid @RequestBody Vendor updatedVendor,
+        BindingResult result) {
   
         if (result.hasErrors()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result.getAllErrors().get(0).getDefaultMessage());
@@ -118,10 +181,15 @@ public class VendorController {
         return ResponseEntity.ok("Vendor profile updated successfully. You are logged out.");
     }
     
+    @Operation(
+        summary = "Change vendor password",
+        description = "Changes the vendor's password and logs them out of all sessions."
+    )
+    @SecurityRequirement(name = "bearerAuth")
     @PutMapping("/change-password")
     public ResponseEntity<String> changeVendorPassword(
-        @Valid @RequestBody PasswordChangeRequest passwordChangeRequest, 
-        HttpServletRequest request, 
+        @Valid @RequestBody PasswordChangeRequest passwordChangeRequest,
+        HttpServletRequest request,
         BindingResult result) {
 
         if (result.hasErrors()) {
@@ -146,37 +214,75 @@ public class VendorController {
         return passwordChangeResponse;
     }
     
+    @Operation(
+        summary = "Delete vendor account",
+        description = "Deletes the vendor's account and deactivates all associated offers."
+    )
+    @SecurityRequirement(name = "bearerAuth")
     @DeleteMapping("/delete")
-    public ResponseEntity<?> deleteVendor(@RequestHeader("Authorization") String token) {
+    public ResponseEntity<?> deleteVendor(
+        @Parameter(description = "JWT token") @RequestHeader("Authorization") String token) {
     	return vendorService.deleteVendorProfile(token); //ovo mora da obrise i sve offere povezane sa vendorom . da ih deaktivira 
     }
     
+    @Operation(
+        summary = "Create new offer",
+        description = "Creates a new offer for the authenticated vendor."
+    )
+    @SecurityRequirement(name = "bearerAuth")
     @PostMapping("/offer-create")
-    public ResponseEntity<String> createOffer(@RequestHeader("Authorization") String token, @RequestBody OfferDto request) {
+    public ResponseEntity<String> createOffer(
+        @Parameter(description = "JWT token") @RequestHeader("Authorization") String token,
+        @RequestBody OfferDto request) {
         vendorService.createOffer(token, request);
         return ResponseEntity.ok("Offer creation request submitted successfully.");
     }
     
+    @Operation(
+        summary = "Get active offers",
+        description = "Retrieves all active offers for the authenticated vendor."
+    )
+    @SecurityRequirement(name = "bearerAuth")
     @GetMapping("/active-offers")
-    public ResponseEntity<List<OfferDto>> getActiveOffersForVendor(@RequestHeader("Authorization") String token) {
+    public ResponseEntity<List<OfferDto>> getActiveOffersForVendor(
+        @Parameter(description = "JWT token") @RequestHeader("Authorization") String token) {
         List<OfferDto> activeOffers = vendorService.getActiveOffersForVendor(token);
         return ResponseEntity.ok(activeOffers);
     }
     
+    @Operation(
+        summary = "Get all offers",
+        description = "Retrieves all offers (active and inactive) for the authenticated vendor."
+    )
+    @SecurityRequirement(name = "bearerAuth")
     @GetMapping("/all-offers")
-    public ResponseEntity<List<OfferDto>> getAllOffersForVendor(@RequestHeader("Authorization") String token) {
+    public ResponseEntity<List<OfferDto>> getAllOffersForVendor(
+        @Parameter(description = "JWT token") @RequestHeader("Authorization") String token) {
         List<OfferDto> activeOffers = vendorService.getAllOffersForVendor(token);
         return ResponseEntity.ok(activeOffers);
     }
     
+    @Operation(
+        summary = "Invalidate offer",
+        description = "Deactivates an existing offer by its ID."
+    )
     @PostMapping("/invalidate-offer/{offerId}")
-    public ResponseEntity<String> invalidateOffer(@PathVariable int offerId){
+    public ResponseEntity<String> invalidateOffer(
+        @Parameter(description = "ID of the offer to deactivate") @PathVariable int offerId) {
     	vendorService.invalidateOffer(offerId);
     	return ResponseEntity.ok("Offer deactivated successfully.");
     }
     
+    @Operation(
+        summary = "Update offer",
+        description = "Updates an existing offer's information."
+    )
+    @SecurityRequirement(name = "bearerAuth")
     @PostMapping("/update-offer/{offerId}")
-    public ResponseEntity<String> updateOffer(@RequestHeader("Authorization") String token, @PathVariable int offerId, @RequestBody OfferDto request){
+    public ResponseEntity<String> updateOffer(
+        @Parameter(description = "JWT token") @RequestHeader("Authorization") String token,
+        @Parameter(description = "ID of the offer to update") @PathVariable Long offerId,
+        @RequestBody OfferDto request) {
     	vendorService.updateOffer(token, offerId, request);
     	return ResponseEntity.ok("Offer updated successfully.");
     }

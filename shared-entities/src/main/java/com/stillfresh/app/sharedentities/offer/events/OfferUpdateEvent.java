@@ -2,8 +2,13 @@ package com.stillfresh.app.sharedentities.offer.events;
 
 import java.time.OffsetDateTime;
 
+import com.stillfresh.app.sharedentities.dto.OfferDto;
+
 public class OfferUpdateEvent {
-	private int offerId;
+	
+	private OfferDto offerDto;
+	
+	private Long offerId;
     private Long vendorId;
     private String name;
     private String description;
@@ -26,32 +31,19 @@ public class OfferUpdateEvent {
 
     public OfferUpdateEvent() {
     }
+    
+    public OfferUpdateEvent(Long vendorId, OfferDto offerDto) {
+    	this.vendorId = vendorId;
+    	this.offerDto = offerDto;
+    }
 
-	public OfferUpdateEvent(int offerId, Long vendorId, String name, String description, double price, double originalPrice,
-			int quantityAvailable, String address, String zipCode, double latitude, double longitude, String businessType,
-			String dietaryInfo, String allergenInfo, OffsetDateTime pickupStartTime, OffsetDateTime pickupEndTime,
-			String imageUrl, double rating, int reviewsCount, OffsetDateTime expirationDate) {
-		super();
-		this.setOfferId(offerId);
-		this.vendorId = vendorId;
-		this.name = name;
-		this.description = description;
-		this.price = price;
-		this.originalPrice = originalPrice;
-		this.quantityAvailable = quantityAvailable;
-		this.address = address;
-		this.zipCode = zipCode;
-		this.latitude = latitude;
-		this.longitude = longitude;
-		this.businessType = businessType;
-		this.dietaryInfo = dietaryInfo;
-		this.allergenInfo = allergenInfo;
-		this.pickupStartTime = pickupStartTime;
-		this.pickupEndTime = pickupEndTime;
-		this.imageUrl = imageUrl;
-		this.rating = rating;
-		this.reviewsCount = reviewsCount;
-		this.expirationDate = expirationDate;
+	
+	public OfferDto getOfferDto() {
+		return offerDto;
+	}
+
+	public void setOfferDto(OfferDto offerDto) {
+		this.offerDto = offerDto;
 	}
 
 	public Long getVendorId() {
@@ -206,11 +198,11 @@ public class OfferUpdateEvent {
 		this.expirationDate = expirationDate;
 	}
 
-	public int getOfferId() {
+	public Long getOfferId() {
 		return offerId;
 	}
 
-	public void setOfferId(int offerId) {
+	public void setOfferId(Long offerId) {
 		this.offerId = offerId;
 	}
 }

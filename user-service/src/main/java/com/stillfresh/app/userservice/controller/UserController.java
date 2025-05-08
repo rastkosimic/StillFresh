@@ -2,6 +2,7 @@ package com.stillfresh.app.userservice.controller;
 
 import com.stillfresh.app.userservice.client.AuthorizationServiceClient;
 import com.stillfresh.app.sharedentities.dto.CheckAvailabilityRequest;
+import com.stillfresh.app.sharedentities.dto.OfferDto;
 import com.stillfresh.app.sharedentities.responses.ApiResponse;
 import com.stillfresh.app.sharedentities.responses.ErrorResponse;
 import com.stillfresh.app.userservice.dto.PasswordChangeRequest;
@@ -24,6 +25,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,16 +106,16 @@ public class UserController {
     }
 
     @Operation(summary = "Get all users", description = "Retrieves a list of all registered users.")
-    @GetMapping
+    @GetMapping("/allUsers")
     public ResponseEntity<List<User>> getAllUsers() {
         List<User> users = userService.findAllUsers();
         return ResponseEntity.ok(users);
     }
 
-    @Operation(summary = "Get user by ID", description = "Retrieves a user by their ID.")
-    @GetMapping("/{id}")
-    public ResponseEntity<User> getUserById(@PathVariable Long id) {
-        User user = userService.findUserById(id);
+    @Operation(summary = "Get user", description = "Retrieves a user from authentication token using their email")
+    @GetMapping
+    public ResponseEntity<User> getUser(@RequestHeader("Authorization") String token) {
+        User user = userService.extractUserFromToken(token);
         return ResponseEntity.ok(user);
     }
 
@@ -213,8 +215,19 @@ public class UserController {
         return ResponseEntity.ok("Password reset successfully");
     }
     
+    @Operation(summary = "Deletes a user's profile", description = "It marks user as deleted in the database. It does not actually remove the user. User is extracted from the token.")
     @DeleteMapping("/delete")
     public ResponseEntity<?> deleteUser(@RequestHeader("Authorization") String token) {
     	return userService.deleteUserProfile(token);
     }
+    
+    @GetMapping("/offers/nearby")
+    public ResponseEntity<List<OfferDto>> getNearbyOffers( 
+            @RequestParam double latitude, 
+            @RequestParam double longitude, 
+            @RequestParam double range) throws ExecutionException {
+        List<OfferDto> nearbyOffers = userService.getNearbyOffers(latitude, longitude, range);
+        return ResponseEntity.ok(nearbyOffers);
+    }
+
 }

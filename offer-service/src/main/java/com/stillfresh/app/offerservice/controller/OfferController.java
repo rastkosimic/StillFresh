@@ -44,7 +44,7 @@ public class OfferController {
     }
 
     @GetMapping("/{id}")
-    public Offer getOfferById(@PathVariable int id) {
+    public Offer getOfferById(@PathVariable Long id) {
         return offerService.getOfferById(id)
                 .orElseThrow(() -> new RuntimeException("Offer not found"));
     }

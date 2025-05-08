@@ -1,14 +1,19 @@
 package com.stillfresh.app.userservice.service;
 
+import com.stillfresh.app.sharedentities.dto.OfferDto;
 import com.stillfresh.app.sharedentities.enums.Role;
 import com.stillfresh.app.sharedentities.enums.Status;
 import com.stillfresh.app.sharedentities.exceptions.ResourceNotFoundException;
+import com.stillfresh.app.sharedentities.offer.events.OfferRequestEvent;
+import com.stillfresh.app.sharedentities.order.events.OrderRequestEvent;
+import com.stillfresh.app.sharedentities.payment.events.UpdatePaymentServiceEvent;
 import com.stillfresh.app.sharedentities.shared.events.TokenRequestEvent;
 import com.stillfresh.app.sharedentities.shared.events.TokenValidationResponseEvent;
 import com.stillfresh.app.sharedentities.user.events.UpdateUserProfileEvent;
 import com.stillfresh.app.sharedentities.user.events.UserRegisteredEvent;
 import com.stillfresh.app.sharedentities.user.events.UserVerifiedEvent;
 import com.stillfresh.app.userservice.dto.PasswordChangeRequest;
+import com.stillfresh.app.userservice.listener.AvailableOfferListener;
 import com.stillfresh.app.userservice.model.User;
 import com.stillfresh.app.userservice.model.VerificationToken;
 import com.stillfresh.app.userservice.publisher.UserEventPublisher;
@@ -18,9 +23,14 @@ import com.stillfresh.app.userservice.security.CustomUserDetails;
 import com.stillfresh.app.userservice.security.JwtUtil;
 
 import java.io.IOException;
+import java.security.Principal;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,6 +69,9 @@ public class UserService {
     
     @Autowired
     private EmailService emailService;
+    
+    @Autowired    
+    private AvailableOfferListener availableOfferListener;
     
     private static final Logger logger = LoggerFactory.getLogger(UserService.class);
     
@@ -116,6 +129,8 @@ public class UserService {
     public void updateUser(User updatedUser) {
         CustomUserDetails customUserDetails = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         User currentUser = customUserDetails.getUser();
+        
+        String oldUsername = currentUser.getUsername();
 
         currentUser.setUsername(updatedUser.getUsername());
         // Add other fields as needed
@@ -124,6 +139,8 @@ public class UserService {
         //Creating an event that will be utilized by authorization-service
         eventPublisher.publishUpdateUserProfileEvent(new UpdateUserProfileEvent(currentUser.getUsername(), currentUser.getEmail(), currentUser.getPassword(), currentUser.getRole(), currentUser.getStatus()));
         
+        //Creating and event that updates username in payment-service data table
+        eventPublisher.publishPaymentServiceUpdateEvent(new UpdatePaymentServiceEvent(oldUsername, currentUser.getUsername()));
     }
     
     @CacheEvict(value = "users", allEntries = true)
@@ -170,6 +187,23 @@ public class UserService {
     public Optional<User> findByEmail(String email) {
         return userRepository.findByEmail(email);
     }
+    
+	public User extractUserFromToken(String authorizationHeader) {
+	    if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+		      throw new RuntimeException("Invalid Authorization header");
+		  }
+		  String jwt = authorizationHeader.substring(7); // Remove "Bearer " prefix
+		  
+		  String email = jwtUtil.extractEmail(jwt);
+			
+		  // Retrieve the user from the cache
+		  Optional<User> cachedUser = findByEmail(email);
+		  if (cachedUser.isEmpty()) {
+		      throw new RuntimeException("User not found in cache");
+		  }
+		
+		  return cachedUser.get();
+	}
     
     @CachePut(value = "users", key = "#user.id")
     public User updateUserProfile(Long userId, User updatedUser) {
@@ -245,5 +279,48 @@ public class UserService {
 	    eventPublisher.publishTokenInvalidationRequest(new TokenRequestEvent(jwt, null));
         return ResponseEntity.ok("User deleted successfully");
 	}
+
+    public List<OfferDto> getNearbyOffers(double latitude, double longitude, double range) throws ExecutionException {
+        String requestId = UUID.randomUUID().toString();
+        logger.info("Generated requestId: {}", requestId);
+
+        // Register the requestId in the pendingRequests map
+        CompletableFuture<List<OfferDto>> future = new CompletableFuture<>();
+        availableOfferListener.registerPendingRequest(requestId, future);
+
+        // Publish the OfferRequestEvent
+        eventPublisher.publishOfferRequestEvent(new OfferRequestEvent(requestId, latitude, longitude, range));
+
+        try {
+            // Wait for and retrieve the response
+            return availableOfferListener.getAvailableOffers(requestId, 5000);
+        } catch (TimeoutException e) {
+            logger.error("Timed out while waiting for AvailableOffersEvent for requestId: {}", requestId);
+            future.completeExceptionally(e); // Cleanup the future
+            throw new RuntimeException("Timeout while fetching offers");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.error("Interrupted while waiting for AvailableOffersEvent for requestId: {}", requestId);
+            future.completeExceptionally(e); // Cleanup the future
+            throw new RuntimeException("Interrupted while fetching offers");
+        } finally {
+            availableOfferListener.removePendingRequest(requestId); // Cleanup the map
+        }
+    }
+
+    public void publishOrderRequest(Principal principal, OrderRequestEvent orderRequest) {
+        try {
+            logger.info("Publishing OrderRequestEvent: {}", orderRequest);
+            User user = findUserByUsername(principal.getName());
+            orderRequest.setUserId(user.getId());
+            orderRequest.setUsername(user.getUsername());
+            eventPublisher.publishOrderRequestEvent(orderRequest);
+        } catch (Exception e) {
+            logger.error("Failed to publish OrderRequestEvent: {}", e.getMessage());
+            throw new RuntimeException("Failed to submit order request.");
+        }
+    }
+
+
 
 }

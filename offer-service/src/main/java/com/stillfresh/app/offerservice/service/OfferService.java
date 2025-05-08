@@ -1,5 +1,6 @@
 package com.stillfresh.app.offerservice.service;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -14,9 +15,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.stillfresh.app.offerservice.model.Offer;
+import com.stillfresh.app.offerservice.publisher.OfferEventPublisher;
 import com.stillfresh.app.offerservice.repository.OfferRepository;
 import com.stillfresh.app.sharedentities.dto.OfferDto;
+import com.stillfresh.app.sharedentities.offer.events.AvailableOffersEvent;
 import com.stillfresh.app.sharedentities.offer.events.OfferCreationEvent;
+import com.stillfresh.app.sharedentities.offer.events.OfferDetailsRequestedEvent;
+import com.stillfresh.app.sharedentities.offer.events.OfferDetailsResponseEvent;
+import com.stillfresh.app.sharedentities.offer.events.OfferQuantityUpdatedEvent;
 import com.stillfresh.app.sharedentities.offer.events.OfferUpdateEvent;
 import com.stillfresh.app.sharedentities.vendor.events.OfferRelatedVendorDetailsEvent;
 
@@ -27,11 +33,15 @@ public class OfferService {
 	
     @Autowired
     private OfferRepository offerRepository;
+    
+    @Autowired
+    private OfferEventPublisher eventPublisher;
 
     @CacheEvict(value = "activeOffers", allEntries = true)
     public Offer createOffer(OfferCreationEvent event) {
     	Offer offer = new Offer();
     	offer.setVendorId(event.getVendorId());
+    	offer.setVendorName(event.getVendorName());
     	offer.setName(event.getName());
     	offer.setDescription(event.getDescription());
     	offer.setPrice(event.getPrice());
@@ -56,28 +66,29 @@ public class OfferService {
     }
     
 	public Offer updateOffer(OfferUpdateEvent event) {
-		Offer offer = getOfferById(event.getOfferId()).get();
+		Offer offer = getOfferById(event.getOfferDto().getId()).get();
 		
 		offer.setActive(true);
-		offer.setLatitude(event.getLatitude());
-		offer.setLongitude(event.getLongitude());
-		offer.setOriginalPrice(event.getOriginalPrice());
-		offer.setPrice(event.getPrice());
-		offer.setQuantityAvailable(event.getQuantityAvailable());
-		offer.setRating(event.getRating());
-		offer.setReviewsCount(event.getReviewsCount());
-		offer.setExpirationDate(event.getExpirationDate());
-		offer.setPickupStartTime(event.getPickupStartTime());
-		offer.setPickupEndTime(event.getPickupEndTime());
+		offer.setLatitude(event.getOfferDto().getLatitude());
+		offer.setLongitude(event.getOfferDto().getLongitude());
+		offer.setOriginalPrice(event.getOfferDto().getOriginalPrice());
+		offer.setPrice(event.getOfferDto().getPrice());
+		offer.setQuantityAvailable(event.getOfferDto().getQuantityAvailable());
+		offer.setRating(event.getOfferDto().getRating());
+		offer.setReviewsCount(event.getOfferDto().getReviewsCount());
+		offer.setExpirationDate(event.getOfferDto().getExpirationDate());
+		offer.setPickupStartTime(event.getOfferDto().getPickupStartTime());
+		offer.setPickupEndTime(event.getOfferDto().getPickupEndTime());
 		offer.setVendorId(event.getVendorId());
-		offer.setAddress(event.getAddress());
-		offer.setAllergenInfo(event.getAllergenInfo());
-		offer.setBusinessType(event.getBusinessType());
-		offer.setDescription(event.getDescription());
-		offer.setDietaryInfo(event.getDietaryInfo());
-		offer.setImageUrl(event.getImageUrl());
-		offer.setName(event.getName());
-		offer.setZipCode(event.getZipCode());
+		offer.setAddress(event.getOfferDto().getAddress());
+		offer.setAllergenInfo(event.getOfferDto().getAllergenInfo());
+		offer.setBusinessType(event.getOfferDto().getBusinessType());
+		offer.setDescription(event.getOfferDto().getDescription());
+		offer.setDietaryInfo(event.getOfferDto().getDietaryInfo());
+		offer.setImageUrl(event.getOfferDto().getImageUrl());
+		offer.setName(event.getOfferDto().getName());
+		offer.setZipCode(event.getOfferDto().getZipCode());
+		offer.setVendorName(event.getOfferDto().getVendorName());
 
         return offerRepository.save(offer);
 	}
@@ -86,43 +97,23 @@ public class OfferService {
     public List<OfferDto> findActiveOffersForVendor(Long vendorId) {
         List<Offer> activeOffers = offerRepository.findByVendorIdAndActive(vendorId, true);
         return activeOffers.stream()
-                .map(this::toDto)
+                .map(this::toOfferDto)
                 .collect(Collectors.toList());
     }
     
 	public List<OfferDto> findAllOffersForVendor(Long vendorId) {
         List<Offer> activeOffers = offerRepository.findByVendorId(vendorId);
         return activeOffers.stream()
-                .map(this::toDto)
+                .map(this::toOfferDto)
                 .collect(Collectors.toList());
 	}
     
-    
-    private OfferDto toDto(Offer offer) {
-        return new OfferDto(
-            offer.getId(), 
-            offer.getName(),
-            offer.getDescription(), 
-            offer.getPrice(), 
-            offer.getOriginalPrice(), 
-            offer.getQuantityAvailable(), 
-            offer.getDietaryInfo(), 
-            offer.getAllergenInfo(), 
-            offer.getImageUrl(), 
-            offer.getRating(), 
-            offer.getReviewsCount(), 
-            offer.getExpirationDate(), 
-            offer.isActive(), 
-            offer.getCreatedAt()
-        );
-    }
-
     
     public List<Offer> getAllOffers() {
         return offerRepository.findAll();
     }
 
-    public Optional<Offer> getOfferById(int id) {
+    public Optional<Offer> getOfferById(Long id) {
         return offerRepository.findById(id);
     }
 
@@ -179,11 +170,98 @@ public class OfferService {
 	public void updateOfferRelatedVendorDetails(OfferRelatedVendorDetailsEvent event) {
         logger.info("Updating offer related vendor's details...");
 		try {
-			offerRepository.updateOfferRelatedVendorDetails(event.getId(), event.getAddress(), event.getZipCode(), event.getLatitude(), event.getLongitude(), event.getBusinessType(), event.getPickupStartTime(), event.getPickupEndTime(), event.getReviewsCount());
+			offerRepository.updateOfferRelatedVendorDetails(event.getId(), event.getVendorName(), event.getAddress(), event.getZipCode(), event.getLatitude(), event.getLongitude(), event.getBusinessType(), event.getPickupStartTime(), event.getPickupEndTime(), event.getReviewsCount());
 			logger.info("Offer related vendor's details updated successfully");
 		} catch (Exception e) {
 			logger.info("Offer related vendor's details failed to update: {}", e.getMessage());
 		}
 	}
 
+	public void findNearbyOffers(double userLat, double userLon, double range, String requestId) {
+	    List<OfferDto> availableOffers = offerRepository.findAll().stream()
+	            .filter(offer -> {
+	                boolean isActive = offer.isActive();
+	                boolean isNotExpired = offer.getExpirationDate().isAfter(OffsetDateTime.now());
+	                double distance = calculateDistance(userLat, userLon, offer.getLatitude(), offer.getLongitude());
+	                logger.info("Offer ID: {}, Active: {}, NotExpired: {}, Distance: {} km",
+	                             offer.getId(), isActive, isNotExpired, distance);
+	                return isActive && isNotExpired && distance <= range;
+	            })
+	            .map(this::toOfferDto)
+	            .collect(Collectors.toList());
+
+	    logger.info("SIZE of available offers list: {}", availableOffers.size());
+
+	    // Include the requestId in the response event
+	    eventPublisher.publishAvailableOffers(new AvailableOffersEvent(requestId, availableOffers));
+	}
+
+
+    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+        double R = 6371; // Earth's radius in kilometers
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                   Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                   Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        
+        double s = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        logger.info("CALCULATED RADIUS: {}", s);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+    
+    private OfferDto toOfferDto(Offer offer) {
+        return new OfferDto(
+            offer.getId(),
+            offer.getVendorName(),
+            offer.getName(),
+            offer.getDescription(),
+            offer.getPrice(),
+            offer.getOriginalPrice(),
+            offer.getQuantityAvailable(),
+            offer.getDietaryInfo(),
+            offer.getAllergenInfo(),
+            offer.getImageUrl(),
+            offer.getRating(),
+            offer.getReviewsCount(),
+            offer.getExpirationDate(),
+            offer.isActive(),
+            offer.getCreatedAt(),
+            offer.getAddress(),
+            offer.getZipCode(),
+            offer.getLatitude(),
+            offer.getLongitude(),
+            offer.getBusinessType(),
+            offer.getPickupStartTime(),
+            offer.getPickupEndTime()
+        );
+    }
+
+    public void respondToOfferDetailsRequest(OfferDetailsRequestedEvent event) {
+        Optional<Offer> offer = offerRepository.findById(event.getOfferId());
+        if (offer.isPresent()) {
+            OfferDto offerDto = toOfferDto(offer.get());
+            eventPublisher.publishOfferDetailsResponseEvent(
+                new OfferDetailsResponseEvent(event.getRequestId(), offerDto)
+            );
+        } else {
+            logger.error("Offer not found for ID: {}", event.getOfferId());
+        }
+    }
+
+	public void updateOfferQuantity(OfferQuantityUpdatedEvent event) {
+	    Offer offer = offerRepository.findById(event.getOfferId())
+	            .orElseThrow(() -> new RuntimeException("Offer not found for ID: " + event.getOfferId()));
+
+	        int newQuantity = offer.getQuantityAvailable() + event.getQuantityChange();
+	        if (newQuantity < 0) {
+	            throw new RuntimeException("Offer quantity cannot be negative");
+	        }
+
+	        offer.setQuantityAvailable(newQuantity);
+	        offerRepository.save(offer);
+	        logger.info("Updated quantity for Offer ID {}: {}", offer.getId(), newQuantity);
+	}
+
+    
 }

@@ -4,6 +4,7 @@ import com.stillfresh.app.offerservice.model.Offer;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -31,10 +32,11 @@ public interface OfferRepository extends JpaRepository<Offer, Integer> {
 
 	@Modifying
 	@Transactional
-	@Query("UPDATE Offer o SET o.address = :address, o.zipCode = :zipCode, o.latitude = :latitude, "
+	@Query("UPDATE Offer o SET o.address = :address, o.vendorName = :vendorName, o.zipCode = :zipCode, o.latitude = :latitude, "
 			+ "o.longitude = :longitude, o.businessType = :businessType, o.pickupStartTime = :pickupStartTime, "
 			+ "o.pickupEndTime = :pickupEndTime, o.reviewsCount = :reviewsCount " + "WHERE o.vendorId = :vendorId")
 	void updateOfferRelatedVendorDetails(@Param("vendorId") Long vendorId, 
+			@Param("vendorName") String vendorName,
 			@Param("address") String address,
 			@Param("zipCode") String zipCode, 
 			@Param("latitude") double latitude,
@@ -43,5 +45,7 @@ public interface OfferRepository extends JpaRepository<Offer, Integer> {
 			@Param("pickupStartTime") OffsetDateTime pickupStartTime,
 			@Param("pickupEndTime") OffsetDateTime pickupEndTime, 
 			@Param("reviewsCount") int reviewsCount);
+
+	Optional<Offer> findById(Long offerId);
 
 }

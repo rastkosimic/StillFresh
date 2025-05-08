@@ -12,13 +12,13 @@ import jakarta.persistence.Table;
 public class Order {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private int id;
+    private Long id;
 
     @Column(name = "offer_id", nullable = false)
-    private int offerId;
+    private Long offerId;
 
     @Column(name = "user_id", nullable = false)
-    private String userId;
+    private Long userId;
 
     @Column(nullable = false)
     private int quantity;
@@ -26,31 +26,31 @@ public class Order {
     @Column(name = "total_price", nullable = false)
     private double totalPrice;
 
-    public int getId() {
-        return id;
-    }
+    public Long getId() {
+		return id;
+	}
 
-    public void setId(int id) {
-        this.id = id;
-    }
+	public void setId(Long id) {
+		this.id = id;
+	}
 
-    public int getOfferId() {
-        return offerId;
-    }
+	public Long getOfferId() {
+		return offerId;
+	}
 
-    public void setOfferId(int offerId) {
-        this.offerId = offerId;
-    }
+	public void setOfferId(Long offerId) {
+		this.offerId = offerId;
+	}
 
-    public String getUserId() {
-        return userId;
-    }
+	public Long getUserId() {
+		return userId;
+	}
 
-    public void setUserId(String userId) {
-        this.userId = userId;
-    }
+	public void setUserId(Long userId) {
+		this.userId = userId;
+	}
 
-    public int getQuantity() {
+	public int getQuantity() {
         return quantity;
     }
 

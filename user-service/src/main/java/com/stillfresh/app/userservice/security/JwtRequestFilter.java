@@ -13,7 +13,6 @@ import com.stillfresh.app.sharedentities.shared.events.TokenRequestEvent;
 import com.stillfresh.app.sharedentities.shared.events.TokenValidationResponseEvent;
 import com.stillfresh.app.userservice.listener.TokenValidationResponseListener;
 import com.stillfresh.app.userservice.publisher.UserEventPublisher;
-import com.stillfresh.app.userservice.service.TokenBlacklistService;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -26,17 +25,13 @@ import java.util.concurrent.TimeUnit;
 
 @Component
 public class JwtRequestFilter extends OncePerRequestFilter {
-//
-//    @Autowired
-//    private JwtUtil jwtUtil;
-//
-//    @Autowired
-//    private TokenBlacklistService tokenBlacklistService;
+
+    @Autowired
+    private JwtUtil jwtUtil;  // ✅ Now using JwtUtil to extract userId
 
     @Autowired
     private UserDetailsService userDetailsService;
     
-
     @Autowired
     private UserEventPublisher eventPublisher;
 
@@ -77,11 +72,18 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                     return;
                 }
 
-                // Set authentication in SecurityContextHolder
+                // ✅ Extract userId from JWT
+                Long userId = jwtUtil.extractUserId(jwt);
+
+                // ✅ Set authentication in SecurityContextHolder
                 UserDetails userDetails = userDetailsService.loadUserByUsername(validationResponse.getUsername());
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities());
+                        userDetails, jwt, userDetails.getAuthorities());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                // ✅ Store userId in SecurityContext for later access
+                request.setAttribute("userId", userId);
+
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
             } catch (InterruptedException e) {
@@ -94,4 +96,3 @@ public class JwtRequestFilter extends OncePerRequestFilter {
         chain.doFilter(request, response);
     }
 }
-
