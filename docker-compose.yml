@@ -294,7 +294,6 @@ services:
       - payment-postgres
       - kafka
     environment:
- #     - STRIPE_API_KEY=sk_test_51QmG1aBMOGvRra45IHo3TZEgO6BstNJ7vJBaPDnJlvQRLRlxowR4ZEsmP86CCrP2P37LYViQbqgbPUEHq1hBxIOa00wZvikl3w
       - KAFKA_BROKER=kafka:9092
     logging:
       driver: "json-file"
