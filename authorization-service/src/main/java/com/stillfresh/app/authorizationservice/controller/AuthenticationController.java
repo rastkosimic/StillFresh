@@ -91,13 +91,8 @@ public class AuthenticationController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<String> logout(@RequestHeader("Authorization") String authHeader) {
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String jwt = authHeader.substring(7);
-            long expiryDurationInMillis = jwtUtil.getExpirationTimeInMillis(jwt) - System.currentTimeMillis();
-            tokenBlacklistService.addTokenToBlacklist(jwt, expiryDurationInMillis);
-        }
-        SecurityContextHolder.clearContext();
+    public ResponseEntity<String> logout() {
+        userService.logoutAndInvalidateToken();
         return ResponseEntity.ok("Logged out successfully");
     }
 

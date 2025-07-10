@@ -38,9 +38,6 @@ public class WebSecurityConfig {
             .authorizeHttpRequests(authz -> authz
                 .requestMatchers("/auth/login", "/vendors/register", "/vendors/verify", "/vendors/forgot-password", "/vendors/reset-password").permitAll()
                 .requestMatchers("/admin/create-initial-admin").permitAll()
-                .requestMatchers("/admin/admins/**").hasRole("SUPER_ADMIN")  // Only Super-Admins can delete admins
-                .requestMatchers("/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN")  // Admin-specific routes
-                .requestMatchers("/vendors/**").hasRole("VENDOR")  // Vendor-specific routes
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()  // Allow access to Swagger
                 .anyRequest().authenticated()
             )

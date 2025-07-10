@@ -20,7 +20,7 @@ public class TokenInvalidationListener {
     public void handleTokenValidation(TokenRequestEvent event) {
         logger.debug("Received TokenRequestEvent: {}", event);
         try {
-            userService.logoutAndInvalidateToken(event.getToken());
+            userService.invalidateToken(event.getToken());
             logger.debug("Token invalidation processed successfully");
         } catch (Exception e) {
             logger.error("Failed to process token invalidation", e);

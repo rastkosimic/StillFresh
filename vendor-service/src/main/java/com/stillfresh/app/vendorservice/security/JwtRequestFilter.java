@@ -79,7 +79,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                 UserDetails userDetails = vendorDetailsService.loadUserByUsername(validationResponse.getUsername());
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities());
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                authentication.setDetails(authorizationHeader);
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
             } catch (InterruptedException e) {

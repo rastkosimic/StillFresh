@@ -237,7 +237,20 @@ public class UserService {
     }
 
     // Token Blacklist handling
-    public void logoutAndInvalidateToken(String jwt) {
+    private String extractTokenFromContext() {
+        String authorizationHeader = SecurityContextHolder.getContext().getAuthentication().getDetails().toString();
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            throw new RuntimeException("Invalid Authorization header");
+        }
+        return authorizationHeader.substring(7); // Remove "Bearer " prefix
+    }
+
+    public void logoutAndInvalidateToken() {
+        String jwt = extractTokenFromContext();
+        invalidateToken(jwt);
+    }
+
+    public void invalidateToken(String jwt) {
         long expiryDurationInMillis = jwtUtil.getExpirationTimeInMillis(jwt) - System.currentTimeMillis();
         tokenBlacklistService.addTokenToBlacklist(jwt, expiryDurationInMillis);
         SecurityContextHolder.clearContext();

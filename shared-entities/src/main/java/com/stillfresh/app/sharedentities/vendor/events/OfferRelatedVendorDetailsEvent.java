@@ -10,15 +10,12 @@ public class OfferRelatedVendorDetailsEvent {
     private double latitude;
     private double longitude;
     private String businessType;
-    private OffsetDateTime pickupStartTime;
-    private OffsetDateTime pickupEndTime;
     private int reviewsCount;
     
     public OfferRelatedVendorDetailsEvent() {}
 
     public OfferRelatedVendorDetailsEvent(Long id, String vendorName, String address, String zipCode, double latitude, double longitude,
-                                          String businessType, OffsetDateTime pickupStartTime, OffsetDateTime pickupEndTime,
-                                          int reviewsCount) {
+                                          String businessType, int reviewsCount) {
         this.id = id;
         this.vendorName = vendorName;
         this.address = address;
@@ -26,8 +23,6 @@ public class OfferRelatedVendorDetailsEvent {
         this.latitude = latitude;
         this.longitude = longitude;
         this.businessType = businessType;
-        this.pickupStartTime = pickupStartTime;
-        this.pickupEndTime = pickupEndTime;
         this.reviewsCount = reviewsCount;
     }
 
@@ -86,22 +81,6 @@ public class OfferRelatedVendorDetailsEvent {
 
     public void setBusinessType(String businessType) {
         this.businessType = businessType;
-    }
-
-    public OffsetDateTime getPickupStartTime() {
-        return pickupStartTime;
-    }
-
-    public void setPickupStartTime(OffsetDateTime pickupStartTime) {
-        this.pickupStartTime = pickupStartTime;
-    }
-
-    public OffsetDateTime getPickupEndTime() {
-        return pickupEndTime;
-    }
-
-    public void setPickupEndTime(OffsetDateTime pickupEndTime) {
-        this.pickupEndTime = pickupEndTime;
     }
 
     public int getReviewsCount() {

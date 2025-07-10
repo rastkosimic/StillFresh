@@ -30,14 +30,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.security.Principal;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -45,14 +41,14 @@ public class PaymentService {
 	
     private static final Logger logger = LoggerFactory.getLogger(PaymentService.class);
 
-    @Value("${stripe.api.key}")
+    @Value("${stripe.apiKey}")
     private String stripeApiKey;
     
     @Autowired
     private StripeProperties stripeProperties;
     
-    @Autowired
-    private JwtUtil jwtUtil;
+//    @Autowired
+//    private JwtUtil jwtUtil;
     
     @Autowired
     private PaymentUserService paymentUserService;
@@ -63,10 +59,21 @@ public class PaymentService {
     @Autowired
     private PaymentEventPublisher eventPublisher;
     
+//    @PostConstruct
+//    public void init() {
+//        Stripe.apiKey = stripeProperties.getApiKey();
+//        logger.info("current stripe api key: {}", stripeProperties.getApiKey());
+//    }
+    
     @PostConstruct
     public void init() {
-        Stripe.apiKey = stripeProperties.getApiKey();
+        Stripe.apiKey = stripeApiKey; // ✅ This line is critical
+        logger.info("Stripe initialized with API key (partially hidden): {}", 
+            stripeApiKey != null && stripeApiKey.length() > 10 
+                ? stripeApiKey.substring(0, 6) + "..." + stripeApiKey.substring(stripeApiKey.length() - 4)
+                : "null or too short");
     }
+
 
     // Register a Card
     public CardRegistrationResponse registerCard(CardRegistrationRequest request, Principal principal) {

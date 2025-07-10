@@ -33,17 +33,6 @@ public class WebSecurityConfig {
         return authenticationConfiguration.getAuthenticationManager();
     }
 
-//    @Bean
-//    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-//        http.csrf(csrf -> csrf.disable())
-//            .authorizeHttpRequests(authz -> authz
-//                .requestMatchers("/offers/**").permitAll() // Allow access if pre-shared key is valid
-//                .anyRequest().authenticated()
-//            )
-//            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
-//        return http.build();
-//    }
-    
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())

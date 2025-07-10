@@ -127,8 +127,7 @@ public class UserService {
     }
     
     public void updateUser(User updatedUser) {
-        CustomUserDetails customUserDetails = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        User currentUser = customUserDetails.getUser();
+        User currentUser = getUserFromContext();
         
         String oldUsername = currentUser.getUsername();
 
@@ -188,8 +187,28 @@ public class UserService {
         return userRepository.findByEmail(email);
     }
     
-	public User extractUserFromToken(String authorizationHeader) {
-	    if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+    private String extractTokenFromContext() {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getDetails() == null) {
+            throw new RuntimeException("No authentication found in context");
+        }
+        
+        String authorizationHeader = authentication.getDetails().toString();
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            throw new RuntimeException("Invalid Authorization header");
+        }
+        return authorizationHeader.substring(7); // Remove "Bearer " prefix
+    }
+
+    public User getUserFromContext() {
+        String jwt = extractTokenFromContext();
+        String email = jwtUtil.extractEmail(jwt);
+        return findByEmail(email)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+    }
+
+    public User extractUserFromToken(String authorizationHeader) {
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
 		      throw new RuntimeException("Invalid Authorization header");
 		  }
 		  String jwt = authorizationHeader.substring(7); // Remove "Bearer " prefix
@@ -255,30 +274,17 @@ public class UserService {
     }
 
     @CacheEvict(value = "users", allEntries = true)
-	public ResponseEntity<String> deleteUserProfile(String authorizationHeader) {
-	    if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
-	        throw new RuntimeException("Invalid Authorization header");
-	    }
-	    String jwt = authorizationHeader.substring(7); // Remove "Bearer " prefix
-	    
-	    String email = jwtUtil.extractEmail(jwt);
-		
-	    // Retrieve the user from the cache
-	    Optional<User> cachedUser = findByEmail(email);
-	    if (cachedUser.isEmpty()) {
-	        throw new RuntimeException("User not found in cache");
-	    }
-
-	    User user = cachedUser.get();
-
-	    // Mark the user as deleted
-	    user.setStatus(Status.DELETED);
-	    userRepository.save(user);
-        //letting know authorization-service about the status change String username, String email, String password, Role role, Status status
-	    eventPublisher.publishUpdateUserProfileEvent(new UpdateUserProfileEvent(user.getUsername(), user.getEmail(), user.getPassword(), user.getRole(), user.getStatus()));
-	    eventPublisher.publishTokenInvalidationRequest(new TokenRequestEvent(jwt, null));
-        return ResponseEntity.ok("User deleted successfully");
-	}
+    public ResponseEntity<String> deleteUserProfile() {
+        User user = getUserFromContext();
+        user.setStatus(Status.DELETED);
+        userRepository.save(user);
+        
+        // Invalidate the token
+        String token = extractTokenFromContext();
+        tokenBlacklistService.addTokenToBlacklist(token, 24 * 60 * 60 * 1000); // 24 hours in milliseconds
+        
+        return ResponseEntity.ok("User profile deleted successfully");
+    }
 
     public List<OfferDto> getNearbyOffers(double latitude, double longitude, double range) throws ExecutionException {
         String requestId = UUID.randomUUID().toString();
@@ -321,6 +327,10 @@ public class UserService {
         }
     }
 
-
+    public void publishOrderRequest(OrderRequestEvent orderRequest) {
+        User user = getUserFromContext();
+        orderRequest.setUserId(user.getId());
+        eventPublisher.publishOrderRequestEvent(orderRequest);
+    }
 
 }

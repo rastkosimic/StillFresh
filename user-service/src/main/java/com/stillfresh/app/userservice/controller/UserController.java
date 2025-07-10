@@ -16,6 +16,7 @@ import com.stillfresh.app.userservice.service.LoginAttemptService;
 import com.stillfresh.app.userservice.service.UserService;
 import com.stillfresh.app.userservice.repository.PasswordResetTokenRepository;
 import com.stillfresh.app.userservice.repository.VerificationTokenRepository;
+import com.stillfresh.app.sharedentities.order.events.OrderRequestEvent;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -40,6 +41,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
 @RestController
 @RequestMapping("/users")
@@ -99,13 +101,16 @@ public class UserController {
     }
 
     @Operation(summary = "Admin Endpoint", description = "Access restricted to users with ADMIN role.")
+    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @GetMapping("/admin")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> adminEndpoint() {
         return ResponseEntity.ok("Admin content");
     }
 
     @Operation(summary = "Get all users", description = "Retrieves a list of all registered users.")
+    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @GetMapping("/allUsers")
     public ResponseEntity<List<User>> getAllUsers() {
         List<User> users = userService.findAllUsers();
@@ -113,25 +118,35 @@ public class UserController {
     }
 
     @Operation(summary = "Get user", description = "Retrieves a user from authentication token using their email")
+    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('USER')")
     @GetMapping
-    public ResponseEntity<User> getUser(@RequestHeader("Authorization") String token) {
-        User user = userService.extractUserFromToken(token);
+    public ResponseEntity<User> getUser() {
+        User user = userService.getUserFromContext();
         return ResponseEntity.ok(user);
     }
 
-    @Operation(summary = "Update user profile", description = "Allows a user to update their profile information.")
-    @PutMapping("/profile")
-    public ResponseEntity<String> updateUserProfile(@Valid @RequestBody User updatedUserDetails, BindingResult result) {
-    	
+    @Operation(
+        summary = "Update user profile",
+        description = "Updates the user's profile information. Requires authentication."
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('USER')")
+    @PutMapping("/update-profile")
+    public ResponseEntity<String> updateUserProfile(
+        @Valid @RequestBody User updatedUser,
+        BindingResult result) {
+  
         if (result.hasErrors()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result.getAllErrors().get(0).getDefaultMessage());
         }
-
-        userService.updateUser(updatedUserDetails);
-        return ResponseEntity.ok("User profile successfully updated");
+        userService.updateUser(updatedUser);
+        return ResponseEntity.ok("User profile updated successfully");
     }
 
     @Operation(summary = "Change password", description = "Allows a user to change their password.")
+    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('USER')")
     @PutMapping("/change-password")
     public ResponseEntity<String> changeUserPassword(
         @Valid @RequestBody PasswordChangeRequest passwordChangeRequest, HttpServletRequest request, BindingResult result) {
@@ -215,10 +230,15 @@ public class UserController {
         return ResponseEntity.ok("Password reset successfully");
     }
     
-    @Operation(summary = "Deletes a user's profile", description = "It marks user as deleted in the database. It does not actually remove the user. User is extracted from the token.")
+    @Operation(
+        summary = "Delete user account",
+        description = "Deletes the user's account and invalidates their token."
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('USER')")
     @DeleteMapping("/delete")
-    public ResponseEntity<?> deleteUser(@RequestHeader("Authorization") String token) {
-    	return userService.deleteUserProfile(token);
+    public ResponseEntity<?> deleteUser() {
+        return userService.deleteUserProfile();
     }
     
     @GetMapping("/offers/nearby")
@@ -228,6 +248,18 @@ public class UserController {
             @RequestParam double range) throws ExecutionException {
         List<OfferDto> nearbyOffers = userService.getNearbyOffers(latitude, longitude, range);
         return ResponseEntity.ok(nearbyOffers);
+    }
+
+    @Operation(
+        summary = "Submit order request",
+        description = "Submits an order request for the authenticated user."
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('USER')")
+    @PostMapping("/order-request")
+    public ResponseEntity<String> submitOrderRequest(@RequestBody OrderRequestEvent orderRequest) {
+        userService.publishOrderRequest(orderRequest);
+        return ResponseEntity.ok("Order request submitted successfully");
     }
 
 }

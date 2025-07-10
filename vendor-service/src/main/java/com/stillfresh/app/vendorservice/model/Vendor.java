@@ -61,12 +61,6 @@ public class Vendor implements Account{
     @ElementCollection
     private List<String> surplusFoodDetails; // e.g., ["Baked Goods", "Prepared Meals"]
 
-    @NotBlank(message = "Puckup start time must not be blank")
-    private OffsetDateTime pickupStartTime;
-
-	@NotBlank(message = "Puckup end time must not be blank")
-    private OffsetDateTime pickupEndTime;
-
     private String pricingInfo; // Pricing details for surplus food packages
 
     private String environmentalCertifications; // Eco-friendly practices or certifications
@@ -217,21 +211,6 @@ public class Vendor implements Account{
 
 	public boolean isActive() {
 		return this.status == Status.ACTIVE;
-	}
-    public OffsetDateTime getPickupStartTime() {
-		return pickupStartTime;
-	}
-
-	public void setPickupStartTime(OffsetDateTime pickupStartTime) {
-		this.pickupStartTime = pickupStartTime;
-	}
-
-	public OffsetDateTime getPickupEndTime() {
-		return pickupEndTime;
-	}
-
-	public void setPickupEndTime(OffsetDateTime pickupEndTime) {
-		this.pickupEndTime = pickupEndTime;
 	}
 
 	public String getImageUrl() {

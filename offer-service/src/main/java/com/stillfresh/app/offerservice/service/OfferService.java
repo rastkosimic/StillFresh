@@ -170,7 +170,7 @@ public class OfferService {
 	public void updateOfferRelatedVendorDetails(OfferRelatedVendorDetailsEvent event) {
         logger.info("Updating offer related vendor's details...");
 		try {
-			offerRepository.updateOfferRelatedVendorDetails(event.getId(), event.getVendorName(), event.getAddress(), event.getZipCode(), event.getLatitude(), event.getLongitude(), event.getBusinessType(), event.getPickupStartTime(), event.getPickupEndTime(), event.getReviewsCount());
+			offerRepository.updateOfferRelatedVendorDetails(event.getId(), event.getVendorName(), event.getAddress(), event.getZipCode(), event.getLatitude(), event.getLongitude(), event.getBusinessType(),  event.getReviewsCount());
 			logger.info("Offer related vendor's details updated successfully");
 		} catch (Exception e) {
 			logger.info("Offer related vendor's details failed to update: {}", e.getMessage());

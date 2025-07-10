@@ -10,6 +10,7 @@ import com.stillfresh.app.sharedentities.offer.events.OfferDetailsResponseEvent;
 import com.stillfresh.app.sharedentities.offer.events.OfferQuantityUpdatedEvent;
 import com.stillfresh.app.sharedentities.order.events.OrderRequestEvent;
 import com.stillfresh.app.sharedentities.payment.events.PaymentRequestEvent;
+import com.stillfresh.app.sharedentities.order.events.OrderPlacedEvent;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -161,12 +162,23 @@ public class OrderService {
                 order.setQuantity(orderEvent.getQuantity());
                 order.setTotalPrice(convertPriceToCents(orderEvent.getQuantity())); 
 
-                orderRepository.save(order);
+                order = orderRepository.save(order);
                 logger.info("Order confirmed with ID: {}", order.getId());
 
                 // ✅ Reduce stock quantity
                 eventPublisher.publishOfferQuantityUpdatedEvent(
                     new OfferQuantityUpdatedEvent(orderEvent.getOfferId(), -orderEvent.getQuantity())
+                );
+
+                // ✅ Publish order placed event
+                eventPublisher.publishOrderPlacedEvent(
+                    new OrderPlacedEvent(
+                        order.getId().toString(),
+                        orderEvent.getUserId().toString(),
+                        orderEvent.getOfferId().intValue(),
+                        orderEvent.getQuantity(),
+                        order.getTotalPrice()
+                    )
                 );
 
             });

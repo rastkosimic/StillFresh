@@ -152,10 +152,8 @@ public class VendorController {
         summary = "Get vendor by ID",
         description = "Retrieves vendor information by their ID."
     )
-    @ApiResponses(value = {
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Vendor found successfully"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Vendor not found")
-    })
+    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('VENDOR')")
     @GetMapping("/{id}")
     public ResponseEntity<Vendor> getVendorById(
         @Parameter(description = "Vendor ID") @PathVariable Long id) {
@@ -168,16 +166,16 @@ public class VendorController {
         description = "Updates the vendor's profile information. Requires authentication and logs out the user after successful update."
     )
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('VENDOR')")
     @PutMapping("/update-profile")
     public ResponseEntity<String> updateVendorProfile(
-        @Parameter(description = "JWT token") @RequestHeader("Authorization") String token,
         @Valid @RequestBody Vendor updatedVendor,
         BindingResult result) {
   
         if (result.hasErrors()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result.getAllErrors().get(0).getDefaultMessage());
         }
-        vendorService.updateVendorProfile(token, updatedVendor);
+        vendorService.updateVendorProfile(updatedVendor);
         return ResponseEntity.ok("Vendor profile updated successfully. You are logged out.");
     }
     
@@ -186,6 +184,7 @@ public class VendorController {
         description = "Changes the vendor's password and logs them out of all sessions."
     )
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('VENDOR')")
     @PutMapping("/change-password")
     public ResponseEntity<String> changeVendorPassword(
         @Valid @RequestBody PasswordChangeRequest passwordChangeRequest,
@@ -219,10 +218,10 @@ public class VendorController {
         description = "Deletes the vendor's account and deactivates all associated offers."
     )
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('VENDOR')")
     @DeleteMapping("/delete")
-    public ResponseEntity<?> deleteVendor(
-        @Parameter(description = "JWT token") @RequestHeader("Authorization") String token) {
-    	return vendorService.deleteVendorProfile(token); //ovo mora da obrise i sve offere povezane sa vendorom . da ih deaktivira 
+    public ResponseEntity<?> deleteVendor() {
+        return vendorService.deleteVendorProfile();
     }
     
     @Operation(
@@ -230,12 +229,11 @@ public class VendorController {
         description = "Creates a new offer for the authenticated vendor."
     )
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('VENDOR')")
     @PostMapping("/offer-create")
-    public ResponseEntity<String> createOffer(
-        @Parameter(description = "JWT token") @RequestHeader("Authorization") String token,
-        @RequestBody OfferDto request) {
-        vendorService.createOffer(token, request);
-        return ResponseEntity.ok("Offer creation request submitted successfully.");
+    public ResponseEntity<String> createOffer(@RequestBody OfferDto request) {
+        vendorService.createOffer(request);
+        return ResponseEntity.ok("Offer created successfully");
     }
     
     @Operation(
@@ -243,11 +241,10 @@ public class VendorController {
         description = "Retrieves all active offers for the authenticated vendor."
     )
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('VENDOR')")
     @GetMapping("/active-offers")
-    public ResponseEntity<List<OfferDto>> getActiveOffersForVendor(
-        @Parameter(description = "JWT token") @RequestHeader("Authorization") String token) {
-        List<OfferDto> activeOffers = vendorService.getActiveOffersForVendor(token);
-        return ResponseEntity.ok(activeOffers);
+    public ResponseEntity<List<OfferDto>> getActiveOffersForVendor() {
+        return ResponseEntity.ok(vendorService.getActiveOffersForVendor());
     }
     
     @Operation(
@@ -255,17 +252,18 @@ public class VendorController {
         description = "Retrieves all offers (active and inactive) for the authenticated vendor."
     )
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('VENDOR')")
     @GetMapping("/all-offers")
-    public ResponseEntity<List<OfferDto>> getAllOffersForVendor(
-        @Parameter(description = "JWT token") @RequestHeader("Authorization") String token) {
-        List<OfferDto> activeOffers = vendorService.getAllOffersForVendor(token);
-        return ResponseEntity.ok(activeOffers);
+    public ResponseEntity<List<OfferDto>> getAllOffersForVendor() {
+        return ResponseEntity.ok(vendorService.getAllOffersForVendor());
     }
     
     @Operation(
         summary = "Invalidate offer",
         description = "Deactivates an existing offer by its ID."
     )
+    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('VENDOR')")
     @PostMapping("/invalidate-offer/{offerId}")
     public ResponseEntity<String> invalidateOffer(
         @Parameter(description = "ID of the offer to deactivate") @PathVariable int offerId) {
@@ -278,13 +276,13 @@ public class VendorController {
         description = "Updates an existing offer's information."
     )
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('VENDOR')")
     @PostMapping("/update-offer/{offerId}")
     public ResponseEntity<String> updateOffer(
-        @Parameter(description = "JWT token") @RequestHeader("Authorization") String token,
         @Parameter(description = "ID of the offer to update") @PathVariable Long offerId,
         @RequestBody OfferDto request) {
-    	vendorService.updateOffer(token, offerId, request);
-    	return ResponseEntity.ok("Offer updated successfully.");
+        vendorService.updateOffer(offerId, request);
+        return ResponseEntity.ok("Offer updated successfully");
     }
 
 }

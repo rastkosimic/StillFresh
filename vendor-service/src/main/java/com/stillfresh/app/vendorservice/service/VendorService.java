@@ -105,11 +105,24 @@ public class VendorService {
         vendor.setRole(Role.VENDOR);
         vendor.setStatus(Status.INACTIVE);  // Inactive until verified
         
-        // Fetch and assign geo-coordinates
-        double[] coordinates = geoLocationService.getCoordinates(vendor.getAddress());
-        if (coordinates != null) {
-            vendor.setLatitude(coordinates[0]);
-            vendor.setLongitude(coordinates[1]);
+        // Fetch and assign geo-coordinates with fallback
+        try {
+            double[] coordinates = geoLocationService.getCoordinates(vendor.getAddress());
+            if (coordinates != null) {
+                vendor.setLatitude(coordinates[0]);
+                vendor.setLongitude(coordinates[1]);
+                logger.info("Successfully set coordinates for vendor: {}", vendor.getEmail());
+            } else {
+                logger.warn("Could not geocode address for vendor: {}. Setting default coordinates.", vendor.getEmail());
+                // Set default coordinates or leave as null
+                vendor.setLatitude(0.0);
+                vendor.setLongitude(0.0);
+            }
+        } catch (Exception e) {
+            logger.error("Geocoding failed for vendor: {}. Proceeding with registration without coordinates.", vendor.getEmail(), e);
+            // Continue with registration even if geocoding fails
+            vendor.setLatitude(0.0);
+            vendor.setLongitude(0.0);
         }
         
         vendorRepository.save(vendor);
@@ -205,79 +218,124 @@ public class VendorService {
         return new Date(now.getTime() + (hours * 60 * 60 * 1000));  // Expiry time in milliseconds
     }
     
-    public void updateVendorProfile(String authorizationHeader, Vendor updatedVendor) {
-        
-	    Vendor currentVendor = extractVendorFromToken(authorizationHeader);
-//        CustomVendorDetails customVendorDetails = (CustomVendorDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-//        Vendor currentVendor = customVendorDetails.getVendor();
-	    // Update only non-null fields
-	    if (updatedVendor.getUsername() != null) {
-	        currentVendor.setUsername(updatedVendor.getUsername());
-	    }
-	    if (updatedVendor.getAddress() != null) {
-	        currentVendor.setAddress(updatedVendor.getAddress());
-	        // Update geo-coordinates if the address changes
-	        double[] coordinates = geoLocationService.getCoordinates(updatedVendor.getAddress());
-	        if (coordinates != null) {
-	            currentVendor.setLatitude(coordinates[0]);
-	            currentVendor.setLongitude(coordinates[1]);
-	        }
-	    }
-	    if (updatedVendor.getPhone() != null) {
-	        currentVendor.setPhone(updatedVendor.getPhone());
-	    }
-	    if (updatedVendor.getPassword() != null) {
-	        currentVendor.setPassword(passwordEncoder.encode(updatedVendor.getPassword()));
-	    }
-	    if (updatedVendor.getRole() != null) {
-	        currentVendor.setRole(updatedVendor.getRole());
-	    }
-	    if (updatedVendor.getStatus() != null) {
-	        currentVendor.setStatus(updatedVendor.getStatus());
-	    }
-	    if (updatedVendor.getBusinessType() != null) {
-	        currentVendor.setBusinessType(updatedVendor.getBusinessType());
-	    }
-	    if (updatedVendor.getOperatingHours() != null) {
-	        currentVendor.setOperatingHours(updatedVendor.getOperatingHours());
-	    }
-	    if (updatedVendor.getSurplusFoodDetails() != null) {
-	        currentVendor.setSurplusFoodDetails(updatedVendor.getSurplusFoodDetails());
-	    }
-	    if (updatedVendor.getPickupStartTime() != null) {
-	        currentVendor.setPickupStartTime(updatedVendor.getPickupStartTime());
-	    }
-	    if (updatedVendor.getPickupEndTime() != null) {
-	        currentVendor.setPickupEndTime(updatedVendor.getPickupEndTime());
-	    }
-	    if (updatedVendor.getPricingInfo() != null) {
-	        currentVendor.setPricingInfo(updatedVendor.getPricingInfo());
-	    }
-	    if (updatedVendor.getEnvironmentalCertifications() != null) {
-	        currentVendor.setEnvironmentalCertifications(updatedVendor.getEnvironmentalCertifications());
-	    }
-	    if (updatedVendor.getAverageRating() != 0) { // Check for non-zero default values for numeric fields
-	        currentVendor.setAverageRating(updatedVendor.getAverageRating());
-	    }
-	    if (updatedVendor.getReviewsCount() != 0) { // Same for integer fields
-	        currentVendor.setReviewsCount(updatedVendor.getReviewsCount());
-	    }
-	    if (updatedVendor.getImageUrl() != null) {
-	        currentVendor.setImageUrl(updatedVendor.getImageUrl());
-	    }
-	    if (updatedVendor.getZipCode() != null) {
-	        currentVendor.setZipCode(updatedVendor.getZipCode());
-	    }
+    private String extractTokenFromContext() {
+        String authorizationHeader = SecurityContextHolder.getContext().getAuthentication().getDetails().toString();
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            throw new RuntimeException("Invalid Authorization header");
+        }
+        return authorizationHeader.substring(7); // Remove "Bearer " prefix
+    }
+
+    private Vendor getVendorFromContext() {
+        return extractVendorFromToken("Bearer " + extractTokenFromContext());
+    }
+
+    public void updateVendorProfile(Vendor updatedVendor) {
+        Vendor currentVendor = getVendorFromContext();
+        // Update only non-null fields
+        if (updatedVendor.getUsername() != null) {
+            currentVendor.setUsername(updatedVendor.getUsername());
+        }
+        if (updatedVendor.getAddress() != null) {
+            currentVendor.setAddress(updatedVendor.getAddress());
+            // Update geo-coordinates if the address changes
+            double[] coordinates = geoLocationService.getCoordinates(updatedVendor.getAddress());
+            if (coordinates != null) {
+                currentVendor.setLatitude(coordinates[0]);
+                currentVendor.setLongitude(coordinates[1]);
+            }
+        }
+        if (updatedVendor.getPhone() != null) {
+            currentVendor.setPhone(updatedVendor.getPhone());
+        }
+        if (updatedVendor.getPassword() != null) {
+            currentVendor.setPassword(passwordEncoder.encode(updatedVendor.getPassword()));
+        }
+        if (updatedVendor.getRole() != null) {
+            currentVendor.setRole(updatedVendor.getRole());
+        }
+        if (updatedVendor.getStatus() != null) {
+            currentVendor.setStatus(updatedVendor.getStatus());
+        }
+        if (updatedVendor.getBusinessType() != null) {
+            currentVendor.setBusinessType(updatedVendor.getBusinessType());
+        }
+        if (updatedVendor.getOperatingHours() != null) {
+            currentVendor.setOperatingHours(updatedVendor.getOperatingHours());
+        }
+        if (updatedVendor.getSurplusFoodDetails() != null) {
+            currentVendor.setSurplusFoodDetails(updatedVendor.getSurplusFoodDetails());
+        }
+ 
+        if (updatedVendor.getPricingInfo() != null) {
+            currentVendor.setPricingInfo(updatedVendor.getPricingInfo());
+        }
+        if (updatedVendor.getEnvironmentalCertifications() != null) {
+            currentVendor.setEnvironmentalCertifications(updatedVendor.getEnvironmentalCertifications());
+        }
+        if (updatedVendor.getAverageRating() != 0) {
+            currentVendor.setAverageRating(updatedVendor.getAverageRating());
+        }
+        if (updatedVendor.getReviewsCount() != 0) {
+            currentVendor.setReviewsCount(updatedVendor.getReviewsCount());
+        }
+        if (updatedVendor.getImageUrl() != null) {
+            currentVendor.setImageUrl(updatedVendor.getImageUrl());
+        }
+        if (updatedVendor.getZipCode() != null) {
+            currentVendor.setZipCode(updatedVendor.getZipCode());
+        }
         
         vendorRepository.save(currentVendor);
         
-        //Creating an event that will be utilized by authorization-service
         eventPublisher.publishUpdateVendorProfileEvent(new UpdateVendorProfileEvent(currentVendor.getUsername(), currentVendor.getEmail(), currentVendor.getPassword(), currentVendor.getRole(), currentVendor.getStatus()));
-        //updating all the details an offer gets from the vendor
-        eventPublisher.publishOfferRelatedVendorDetailsEvent(new OfferRelatedVendorDetailsEvent(currentVendor.getId(), currentVendor.getUsername(), currentVendor.getAddress(), currentVendor.getZipCode(), currentVendor.getLatitude(), currentVendor.getLongitude(), currentVendor.getBusinessType(),currentVendor.getPickupStartTime(), currentVendor.getPickupEndTime(),currentVendor.getReviewsCount()));
-        logoutAndInvalidateToken(authorizationHeader.substring(7));
+        eventPublisher.publishOfferRelatedVendorDetailsEvent(new OfferRelatedVendorDetailsEvent(currentVendor.getId(), currentVendor.getUsername(), currentVendor.getAddress(), currentVendor.getZipCode(), currentVendor.getLatitude(), currentVendor.getLongitude(), currentVendor.getBusinessType(), currentVendor.getReviewsCount()));
+        logoutAndInvalidateToken(extractTokenFromContext());
     }
 
+    public ResponseEntity<String> deleteVendorProfile() {
+        String jwt = extractTokenFromContext();
+        Vendor vendor = getVendorFromContext();
+
+        vendor.setStatus(Status.DELETED);
+        vendorRepository.save(vendor);
+        
+        eventPublisher.publishUpdateVendorProfileEvent(new UpdateVendorProfileEvent(vendor.getUsername(), vendor.getEmail(), vendor.getPassword(), vendor.getRole(), vendor.getStatus()));
+        eventPublisher.publishTokenInvalidationRequest(new TokenRequestEvent(jwt, null));
+        eventPublisher.invalidateAllOffers(new AllOffersInvalidationEvent(vendor.getId()));
+        return ResponseEntity.ok("Vendor deleted successfully");
+    }
+
+    public void createOffer(OfferDto request) {
+        Vendor vendor = getVendorFromContext();
+
+        OfferCreationEvent event = new OfferCreationEvent(vendor.getId(), vendor.getUsername(),request.getName(), request.getDescription(), request.getPrice(), request.getOriginalPrice(), request.getQuantityAvailable(), vendor.getAddress(), vendor.getZipCode(), vendor.getLatitude(), vendor.getLongitude(), 
+                vendor.getBusinessType(), request.getDietaryInfo(), request.getAllergenInfo(), request.getPickupStartTime(), request.getPickupEndTime(), request.getImageUrl(), request.getRating(), request.getReviewsCount(), request.getExpirationDate());
+        eventPublisher.publishOfferCreationEvent(event);
+    }
+
+    public List<OfferDto> getActiveOffersForVendor() {
+        return offerClient.getActiveOffersForVendor(getVendorFromContext().getId());
+    }
+    
+    public List<OfferDto> getAllOffersForVendor() {
+        return offerClient.getAllOffersForVendor(getVendorFromContext().getId());
+    }
+
+    public void updateOffer(Long offerId, OfferDto request) {
+        Vendor vendor = getVendorFromContext();
+        OfferDto offerDto = new OfferDto(offerId, vendor.getUsername(), request.getName(), request.getDescription(), request.getPrice(), request.getOriginalPrice(), 
+                request.getQuantityAvailable(), request.getDietaryInfo(), request.getAllergenInfo(), request.getImageUrl(), request.getRating(), 
+                vendor.getReviewsCount(), request.getExpirationDate(), true, request.getCreatedAt(), vendor.getAddress(), vendor.getZipCode(), 
+                vendor.getLatitude(), vendor.getLongitude(), vendor.getBusinessType(), request.getPickupStartTime(), request.getPickupEndTime());
+        
+        OfferUpdateEvent event = new OfferUpdateEvent(vendor.getId(), offerDto);
+        eventPublisher.publishUpdateOfferEvent(event);
+    }
+
+    public void invalidateOffer(int offerId) {
+        eventPublisher.publishOfferInvalidationEvent(new OfferInvalidationEvent(offerId));
+    }
 
 	public ResponseEntity<String> changeVendorPassword(Vendor vendor, PasswordChangeRequest passwordChangeRequest) {
 	
@@ -458,56 +516,5 @@ public class VendorService {
 
 	    return cachedVendor.get();
     }
-
-    @CacheEvict(value = "vendor", allEntries = true)
-	public ResponseEntity<String> deleteVendorProfile(String authorizationHeader) {
-
-	    String jwt = authorizationHeader.substring(7); // Remove "Bearer " prefix
-
-	    Vendor vendor = extractVendorFromToken(authorizationHeader);
-
-	    // Mark the user as deleted
-	    vendor.setStatus(Status.DELETED);
-	    vendorRepository.save(vendor);
-        //obavesti auth servis da je status promenjen. tamo ga isto setuj kao deleted. takodje u auth servisu bleklistuj token
-	    eventPublisher.publishUpdateVendorProfileEvent(new UpdateVendorProfileEvent(vendor.getUsername(), vendor.getEmail(), vendor.getPassword(), vendor.getRole(), vendor.getStatus()));
-	    eventPublisher.publishTokenInvalidationRequest(new TokenRequestEvent(jwt, null));
-	    eventPublisher.invalidateAllOffers(new AllOffersInvalidationEvent(vendor.getId()));
-        return ResponseEntity.ok("Vendor deleted successfully");
-	}
-
-	public void createOffer(String authorizationHeader, OfferDto request) {
-		Vendor vendor = extractVendorFromToken(authorizationHeader);
-
-		OfferCreationEvent event = new OfferCreationEvent(vendor.getId(), vendor.getUsername(),request.getName(), request.getDescription(), request.getPrice(), request.getOriginalPrice(), request.getQuantityAvailable(), vendor.getAddress(), vendor.getZipCode(), vendor.getLatitude(), vendor.getLongitude(), 
-				vendor.getBusinessType(), request.getDietaryInfo(), request.getAllergenInfo(), vendor.getPickupStartTime(), vendor.getPickupEndTime(), request.getImageUrl(), request.getRating(), request.getReviewsCount(), request.getExpirationDate());
-		eventPublisher.publishOfferCreationEvent(event);
-		
-	}
-
-	public List<OfferDto> getActiveOffersForVendor(String authorizationHeader) {
-		return offerClient.getActiveOffersForVendor(extractVendorFromToken(authorizationHeader).getId());
-	}
-	
-	public List<OfferDto> getAllOffersForVendor(String authorizationHeader) {
-		return offerClient.getAllOffersForVendor(extractVendorFromToken(authorizationHeader).getId());
-	}
-
-	public void invalidateOffer(int offerId) {
-		eventPublisher.publishOfferInvalidationEvent(new OfferInvalidationEvent(offerId));
-		
-	}
-
-	public void updateOffer(String authorizationHeader, Long offerId, OfferDto request) {
-		     
-		Vendor vendor = extractVendorFromToken(authorizationHeader);
-		OfferDto offerDto = new OfferDto(offerId, vendor.getUsername(), request.getName(), request.getDescription(), request.getPrice(), request.getOriginalPrice(), 
-				request.getQuantityAvailable(), request.getDietaryInfo(), request.getAllergenInfo(), request.getImageUrl(), request.getRating(), 
-				vendor.getReviewsCount(), request.getExpirationDate(), true, request.getCreatedAt(), vendor.getAddress(), vendor.getZipCode(), 
-				vendor.getLatitude(), vendor.getLongitude(), vendor.getBusinessType(), vendor.getPickupStartTime(), vendor.getPickupEndTime());
-		
-		OfferUpdateEvent event = new OfferUpdateEvent(vendor.getId(), offerDto);
-		eventPublisher.publishUpdateOfferEvent(event);
-	}
 
 }

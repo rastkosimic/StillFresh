@@ -33,8 +33,8 @@ public interface OfferRepository extends JpaRepository<Offer, Integer> {
 	@Modifying
 	@Transactional
 	@Query("UPDATE Offer o SET o.address = :address, o.vendorName = :vendorName, o.zipCode = :zipCode, o.latitude = :latitude, "
-			+ "o.longitude = :longitude, o.businessType = :businessType, o.pickupStartTime = :pickupStartTime, "
-			+ "o.pickupEndTime = :pickupEndTime, o.reviewsCount = :reviewsCount " + "WHERE o.vendorId = :vendorId")
+			+ "o.longitude = :longitude, o.businessType = :businessType, "
+			+ "o.reviewsCount = :reviewsCount " + "WHERE o.vendorId = :vendorId")
 	void updateOfferRelatedVendorDetails(@Param("vendorId") Long vendorId, 
 			@Param("vendorName") String vendorName,
 			@Param("address") String address,
@@ -42,8 +42,6 @@ public interface OfferRepository extends JpaRepository<Offer, Integer> {
 			@Param("latitude") double latitude,
 			@Param("longitude") double longitude,
 			@Param("businessType") String businessType, 
-			@Param("pickupStartTime") OffsetDateTime pickupStartTime,
-			@Param("pickupEndTime") OffsetDateTime pickupEndTime, 
 			@Param("reviewsCount") int reviewsCount);
 
 	Optional<Offer> findById(Long offerId);

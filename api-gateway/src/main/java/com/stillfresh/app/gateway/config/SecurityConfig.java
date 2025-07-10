@@ -20,9 +20,6 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(authorize -> authorize
-                // Allow access to Swagger UI and API docs
-                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html", "/webjars/**").permitAll()
-                // Require authentication for all other requests
                 .anyRequest().authenticated()
             )
             .oauth2Login(withDefaults -> {});

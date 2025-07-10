@@ -79,7 +79,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(validationResponse.getUsername());
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         userDetails, jwt, userDetails.getAuthorities());
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                authentication.setDetails(authorizationHeader);  // Store the full "Bearer token" string
 
                 // ✅ Store userId in SecurityContext for later access
                 request.setAttribute("userId", userId);

@@ -21,9 +21,9 @@ services:
       - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
       - KAFKA_CFG_NODE_ID=1
       - KAFKA_KRAFT_MODE=true
-      - KAFKA_KRAFT_CLUSTER_ID=qk6eNRoKT6aFw3XkMJT-dw  # Set this or keep consistent if changed
+      - KAFKA_KRAFT_CLUSTER_ID=qk6eNRoKT6aFw3XkMJT-dw
       - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093  # Required for single-node setup
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
       - ALLOW_PLAINTEXT_LISTENER=yes
     ports:
       - "9092:9092"
@@ -56,7 +56,7 @@ services:
       - "5433:5432"
     volumes:
       - vendor_postgres_data:/var/lib/postgresql/data
-      - ./init-vendor.sql:/docker-entrypoint-initdb.d/init.sql 
+      - ./init-vendor.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - stillfresh_network
 
@@ -71,7 +71,67 @@ services:
       - "5434:5432"
     volumes:
       - auth_postgres_data:/var/lib/postgresql/data
-      - ./init-auth.sql:/docker-entrypoint-initdb.d/init.sql 
+      - ./init-auth.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - stillfresh_network
+
+  # PostgreSQL for offer-service
+  offer-postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: stillfresh_offerdb
+      POSTGRES_USER: stillfreshoffers
+      POSTGRES_PASSWORD: FreshStill011Offers
+    ports:
+      - "5435:5432"
+    volumes:
+      - offer_postgres_data:/var/lib/postgresql/data
+      - ./init-offer.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - stillfresh_network
+
+  # PostgreSQL for order-service
+  order-postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: stillfresh_orderdb
+      POSTGRES_USER: stillfreshorders
+      POSTGRES_PASSWORD: FreshStill011Orders
+    ports:
+      - "5436:5432"
+    volumes:
+      - order_postgres_data:/var/lib/postgresql/data
+      - ./init-order.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - stillfresh_network
+
+  # PostgreSQL for payment-service
+  payment-postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: stillfresh_paymentdb
+      POSTGRES_USER: stillfreshpayments
+      POSTGRES_PASSWORD: FreshStill011Payments
+    ports:
+      - "5437:5432"
+    volumes:
+      - payment_postgres_data:/var/lib/postgresql/data
+      - ./init-payment.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - stillfresh_network
+
+  # PostgreSQL for notification-service
+  notification-postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: stillfresh_notificationdb
+      POSTGRES_USER: stillfreshnotification
+      POSTGRES_PASSWORD: FreshStill011Notification
+    ports:
+      - "5438:5432"
+    volumes:
+      - notification_postgres_data:/var/lib/postgresql/data
+      - ./init-notification.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - stillfresh_network
 
@@ -115,6 +175,9 @@ services:
       - authorization-service
       - user-service
       - vendor-service
+      - offer-service
+      - order-service
+      - payment-service
     logging:
       driver: "json-file"
       options:
@@ -132,7 +195,7 @@ services:
       - eureka-server
       - user-postgres
       - redis
-      - kafka # Depends on Kafka for messaging
+      - kafka
     logging:
       driver: "json-file"
       options:
@@ -150,7 +213,7 @@ services:
       - eureka-server
       - vendor-postgres
       - redis
-      - kafka # Depends on Kafka for messaging
+      - kafka
     environment:
       - KAFKA_BROKER=kafka:9092
     logging:
@@ -170,9 +233,92 @@ services:
       - eureka-server
       - auth-postgres
       - redis
-      - kafka # Depends on Kafka for messaging
+      - kafka
     environment:
       - KAFKA_BROKER=kafka:9092
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - stillfresh_network
+
+  # Offer Service
+  offer-service:
+    build: ./offer-service
+    ports:
+      - "8084:8084"
+    depends_on:
+      - eureka-server
+      - offer-postgres
+      - redis
+      - kafka
+    environment:
+      - KAFKA_BROKER=kafka:9092
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - stillfresh_network
+
+  # Order Service
+  order-service:
+    build: ./order-service
+    ports:
+      - "8085:8085"
+    depends_on:
+      - eureka-server
+      - order-postgres
+      - redis
+      - kafka
+    environment:
+      - KAFKA_BROKER=kafka:9092
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - stillfresh_network
+
+  # Payment Service
+  payment-service:
+    build: ./payment-service
+    ports:
+      - "8086:8086"
+    depends_on:
+      - eureka-server
+      - payment-postgres
+      - kafka
+    environment:
+ #     - STRIPE_API_KEY=sk_test_51QmG1aBMOGvRra45IHo3TZEgO6BstNJ7vJBaPDnJlvQRLRlxowR4ZEsmP86CCrP2P37LYViQbqgbPUEHq1hBxIOa00wZvikl3w
+      - KAFKA_BROKER=kafka:9092
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - stillfresh_network
+
+  # Notification Service
+  notification-service:
+    build: ./notification-service
+    ports:
+      - "8087:8087"
+    depends_on:
+      - eureka-server
+      - notification-postgres
+      - redis
+      - kafka
+    environment:
+      - KAFKA_BROKER=kafka:9092
+      - FIREBASE_CREDENTIALS_PATH=/app/firebase/firebase-service-account.json
+    volumes:
+      - C:/Users/admin/Documents/JosSveze/stillfresh-2412f-firebase-adminsdk.json:/app/firebase/firebase-service-account.json
     logging:
       driver: "json-file"
       options:
@@ -185,6 +331,10 @@ volumes:
   user_postgres_data:
   vendor_postgres_data:
   auth_postgres_data:
+  offer_postgres_data:
+  order_postgres_data:
+  payment_postgres_data:
+  notification_postgres_data:
 
 networks:
   stillfresh_network:
