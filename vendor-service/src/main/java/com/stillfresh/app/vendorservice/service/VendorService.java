@@ -107,7 +107,7 @@ public class VendorService {
         
         // Fetch and assign geo-coordinates with fallback
         try {
-            double[] coordinates = geoLocationService.getCoordinates(vendor.getAddress());
+            double[] coordinates = geoLocationService.getCoordinates(vendor.getAddress(), vendor.getZipCode());
             if (coordinates != null) {
                 vendor.setLatitude(coordinates[0]);
                 vendor.setLongitude(coordinates[1]);
@@ -236,14 +236,10 @@ public class VendorService {
         if (updatedVendor.getUsername() != null) {
             currentVendor.setUsername(updatedVendor.getUsername());
         }
+        boolean addressChanged = false;
         if (updatedVendor.getAddress() != null) {
             currentVendor.setAddress(updatedVendor.getAddress());
-            // Update geo-coordinates if the address changes
-            double[] coordinates = geoLocationService.getCoordinates(updatedVendor.getAddress());
-            if (coordinates != null) {
-                currentVendor.setLatitude(coordinates[0]);
-                currentVendor.setLongitude(coordinates[1]);
-            }
+            addressChanged = true;
         }
         if (updatedVendor.getPhone() != null) {
             currentVendor.setPhone(updatedVendor.getPhone());
@@ -282,10 +278,20 @@ public class VendorService {
         if (updatedVendor.getImageUrl() != null) {
             currentVendor.setImageUrl(updatedVendor.getImageUrl());
         }
+        boolean zipChanged = false;
         if (updatedVendor.getZipCode() != null) {
             currentVendor.setZipCode(updatedVendor.getZipCode());
+            zipChanged = true;
         }
-        
+
+        if (addressChanged || zipChanged) {
+            double[] coordinates = geoLocationService.getCoordinates(currentVendor.getAddress(), currentVendor.getZipCode());
+            if (coordinates != null) {
+                currentVendor.setLatitude(coordinates[0]);
+                currentVendor.setLongitude(coordinates[1]);
+            }
+        }
+
         vendorRepository.save(currentVendor);
         
         eventPublisher.publishUpdateVendorProfileEvent(new UpdateVendorProfileEvent(currentVendor.getUsername(), currentVendor.getEmail(), currentVendor.getPassword(), currentVendor.getRole(), currentVendor.getStatus()));
@@ -404,7 +410,7 @@ public class VendorService {
         vendor.setStatus(Status.INACTIVE);  // Inactive until verified
         
         // Fetch and assign geo-coordinates
-        double[] coordinates = geoLocationService.getCoordinates(vendor.getAddress());
+        double[] coordinates = geoLocationService.getCoordinates(vendor.getAddress(), vendor.getZipCode());
         if (coordinates != null) {
             vendor.setLatitude(coordinates[0]);
             vendor.setLongitude(coordinates[1]);
