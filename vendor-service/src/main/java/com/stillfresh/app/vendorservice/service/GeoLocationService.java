@@ -29,8 +29,8 @@ public class GeoLocationService {
     }
 
     public double[] getCoordinates(String address, String zipCode) {
+    	String query = address;
         try {
-            String query = address;
             if (zipCode != null && !zipCode.isBlank()) {
                 query = address + ", " + zipCode;
             }
