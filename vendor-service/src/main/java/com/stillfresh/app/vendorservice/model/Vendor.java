@@ -71,6 +71,7 @@ public class Vendor implements Account{
     
     private String imageUrl;
     
+    @NotBlank(message = "Zip code cannot be blank")
     private String zipCode; // For approximate searches
     
     private double latitude; // For precise geo-location

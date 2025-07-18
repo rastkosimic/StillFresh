@@ -93,6 +93,24 @@ public class VendorService {
         vendor.setRole(Role.ADMIN);  // Assign the ADMIN role
         vendor.setStatus(Status.ACTIVE);
 
+        // Fetch and assign geo-coordinates with fallback
+        try {
+            double[] coordinates = geoLocationService.getCoordinates(vendor.getAddress(), vendor.getZipCode());
+            if (coordinates != null) {
+                vendor.setLatitude(coordinates[0]);
+                vendor.setLongitude(coordinates[1]);
+                logger.info("Successfully set coordinates for admin: {}", vendor.getEmail());
+            } else {
+                logger.warn("Could not geocode address for admin: {}. Setting default coordinates.", vendor.getEmail());
+                vendor.setLatitude(0.0);
+                vendor.setLongitude(0.0);
+            }
+        } catch (Exception e) {
+            logger.error("Geocoding failed for admin: {}. Proceeding with registration without coordinates.", vendor.getEmail(), e);
+            vendor.setLatitude(0.0);
+            vendor.setLongitude(0.0);
+        }
+
         // Save the admin to the database
         return vendorRepository.save(vendor);
     }
@@ -114,13 +132,11 @@ public class VendorService {
                 logger.info("Successfully set coordinates for vendor: {}", vendor.getEmail());
             } else {
                 logger.warn("Could not geocode address for vendor: {}. Setting default coordinates.", vendor.getEmail());
-                // Set default coordinates or leave as null
                 vendor.setLatitude(0.0);
                 vendor.setLongitude(0.0);
             }
         } catch (Exception e) {
             logger.error("Geocoding failed for vendor: {}. Proceeding with registration without coordinates.", vendor.getEmail(), e);
-            // Continue with registration even if geocoding fails
             vendor.setLatitude(0.0);
             vendor.setLongitude(0.0);
         }
@@ -380,7 +396,26 @@ public class VendorService {
 
         admin.setPassword(passwordEncoder.encode(admin.getPassword()));
         admin.setRole(Role.SUPER_ADMIN);
-        admin.setStatus(Status.ACTIVE);; // Automatically activate the Super-Admin
+        admin.setStatus(Status.ACTIVE); // Automatically activate the Super-Admin
+        
+        // Fetch and assign geo-coordinates with fallback
+        try {
+            double[] coordinates = geoLocationService.getCoordinates(admin.getAddress(), admin.getZipCode());
+            if (coordinates != null) {
+                admin.setLatitude(coordinates[0]);
+                admin.setLongitude(coordinates[1]);
+                logger.info("Successfully set coordinates for super admin: {}", admin.getEmail());
+            } else {
+                logger.warn("Could not geocode address for super admin: {}. Setting default coordinates.", admin.getEmail());
+                admin.setLatitude(0.0);
+                admin.setLongitude(0.0);
+            }
+        } catch (Exception e) {
+            logger.error("Geocoding failed for super admin: {}. Proceeding with registration without coordinates.", admin.getEmail(), e);
+            admin.setLatitude(0.0);
+            admin.setLongitude(0.0);
+        }
+        
         return vendorRepository.save(admin);
     }
 	
@@ -401,54 +436,6 @@ public class VendorService {
         vendorRepository.deleteById(id);
     }
     
-    public Vendor registerVendor(Vendor vendor, boolean isAdmin) throws IOException {    	
-        if (vendorRepository.existsByEmail(vendor.getEmail())) {
-            throw new RuntimeException("Vendor already registered with this email");
-        }
-        vendor.setPassword(passwordEncoder.encode(vendor.getPassword()));
-        vendor.setRole(isAdmin ? Role.ADMIN : Role.VENDOR);  // Set role based on input
-        vendor.setStatus(Status.INACTIVE);  // Inactive until verified
-        
-        // Fetch and assign geo-coordinates
-        double[] coordinates = geoLocationService.getCoordinates(vendor.getAddress(), vendor.getZipCode());
-        if (coordinates != null) {
-            vendor.setLatitude(coordinates[0]);
-            vendor.setLongitude(coordinates[1]);
-        }
-        
-        vendorRepository.save(vendor);
-
-      // Generate verification token
-      String token = UUID.randomUUID().toString();
-      VendorVerificationToken verificationToken = new VendorVerificationToken();
-      verificationToken.setToken(token);
-      verificationToken.setVendor(vendor);
-      vendorVerificationTokenRepository.save(verificationToken);
-
-      // Send verification email
-      
-      String verificationUrl = "http://localhost:8083/vendors/verify?token=" + token;
-      emailService.sendVerificationEmail(vendor.getEmail(), verificationUrl);
-      
-      //Creating an event that will be utilized by authorization-service
-      eventPublisher.publishVendorRegisteredEvent(new VendorRegisteredEvent(vendor.getEmail(), vendor.getPassword(), vendor.getStatus(), vendor.getRole(), vendor.getUsername()));
-
-        return vendor;
-    }
-
-    // Promote existing vendor to admin
-    public void promoteVendorToAdmin(Long vendorId) {
-        Vendor vendor = findVendorById(vendorId);
-
-        // Check if the vendor is already an admin
-        if (vendor.getRole() == Role.ADMIN || vendor.getRole() == Role.SUPER_ADMIN) {
-            throw new RuntimeException("Vendor is already an admin or super-admin");
-        }
-
-        vendor.setRole(Role.ADMIN);
-        vendorRepository.save(vendor);
-    }
-
     public List<Vendor> getAllVendors() {
         return vendorRepository.findAll();
     }
@@ -521,6 +508,65 @@ public class VendorService {
 	    }
 
 	    return cachedVendor.get();
+    }
+
+    // Promote existing vendor to admin
+    public void promoteVendorToAdmin(Long vendorId) {
+        Vendor vendor = findVendorById(vendorId);
+
+        // Check if the vendor is already an admin
+        if (vendor.getRole() == Role.ADMIN || vendor.getRole() == Role.SUPER_ADMIN) {
+            throw new RuntimeException("Vendor is already an admin or super-admin");
+        }
+
+        vendor.setRole(Role.ADMIN);
+        vendorRepository.save(vendor);
+    }
+    
+    public Vendor registerVendor(Vendor vendor, boolean isAdmin) throws IOException {    	
+        if (vendorRepository.existsByEmail(vendor.getEmail())) {
+            throw new RuntimeException("Vendor already registered with this email");
+        }
+        vendor.setPassword(passwordEncoder.encode(vendor.getPassword()));
+        vendor.setRole(isAdmin ? Role.ADMIN : Role.VENDOR);  // Set role based on input
+        vendor.setStatus(Status.INACTIVE);  // Inactive until verified
+        
+        // Fetch and assign geo-coordinates with fallback
+        try {
+            double[] coordinates = geoLocationService.getCoordinates(vendor.getAddress(), vendor.getZipCode());
+            if (coordinates != null) {
+                vendor.setLatitude(coordinates[0]);
+                vendor.setLongitude(coordinates[1]);
+                logger.info("Successfully set coordinates for vendor: {}", vendor.getEmail());
+            } else {
+                logger.warn("Could not geocode address for vendor: {}. Setting default coordinates.", vendor.getEmail());
+                vendor.setLatitude(0.0);
+                vendor.setLongitude(0.0);
+            }
+        } catch (Exception e) {
+            logger.error("Geocoding failed for vendor: {}. Proceeding with registration without coordinates.", vendor.getEmail(), e);
+            vendor.setLatitude(0.0);
+            vendor.setLongitude(0.0);
+        }
+        
+        vendorRepository.save(vendor);
+
+      // Generate verification token
+      String token = UUID.randomUUID().toString();
+      VendorVerificationToken verificationToken = new VendorVerificationToken();
+      verificationToken.setToken(token);
+      verificationToken.setVendor(vendor);
+      vendorVerificationTokenRepository.save(verificationToken);
+
+      // Send verification email
+      
+      String verificationUrl = "http://localhost:8083/vendors/verify?token=" + token;
+      emailService.sendVerificationEmail(vendor.getEmail(), verificationUrl);
+      
+      //Creating an event that will be utilized by authorization-service
+      eventPublisher.publishVendorRegisteredEvent(new VendorRegisteredEvent(vendor.getEmail(), vendor.getPassword(), vendor.getStatus(), vendor.getRole(), vendor.getUsername()));
+
+        return vendor;
     }
 
 }

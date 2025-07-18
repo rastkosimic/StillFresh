@@ -51,16 +51,23 @@ public class VendorController {
     
     @Operation(
         summary = "Register a new vendor",
-        description = "Creates a new vendor account and sends a verification email. The vendor must verify their email before they can log in."
+        description = "Creates a new vendor account and sends a verification email. The vendor must verify their email before they can log in. Required fields: username, email, address, phone, password, zipCode."
     )
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Registration initiated successfully"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Validation failed - missing required fields"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Username or email already exists"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error")
     })
     @PostMapping("/register")
-    public ResponseEntity<?> registerVendor(@RequestBody Vendor vendor) throws IOException {
+    public ResponseEntity<?> registerVendor(@Valid @RequestBody Vendor vendor, BindingResult result) throws IOException {
         try {
+            // Check for validation errors
+            if (result.hasErrors()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ErrorResponse("Validation failed: " + result.getAllErrors().get(0).getDefaultMessage()));
+            }
+            
             // Call the authorization service to check availability
             ApiResponse availabilityResponse = authorizationServiceClient.checkAvailability(
                 new CheckAvailabilityRequest(vendor.getUsername(), vendor.getEmail()));
@@ -83,12 +90,18 @@ public class VendorController {
 
     @Operation(
         summary = "Register a new admin",
-        description = "Creates a new admin account. This endpoint is restricted to existing admins and super admins."
+        description = "Creates a new admin account. This endpoint is restricted to existing admins and super admins. Required fields: username, email, address, phone, password, zipCode."
     )
     @SecurityRequirement(name = "bearerAuth")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PostMapping("/register-admin")
-    public ResponseEntity<String> registerAdmin(@RequestBody Vendor vendor) throws IOException {
+    public ResponseEntity<String> registerAdmin(@Valid @RequestBody Vendor vendor, BindingResult result) throws IOException {
+        // Check for validation errors
+        if (result.hasErrors()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body("Validation failed: " + result.getAllErrors().get(0).getDefaultMessage());
+        }
+        
         vendorService.registerVendor(vendor, true);  // True indicates admin registration
         return ResponseEntity.ok("Admin registration successful. Please verify your email.");
     }
