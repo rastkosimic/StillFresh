@@ -94,10 +94,6 @@
 			<optional>true</optional>
 		</dependency>
 		<dependency>
-			<groupId>com.sendgrid</groupId>
-			<artifactId>sendgrid-java</artifactId>
-		</dependency>
-		<dependency>
 			<groupId>org.springdoc</groupId>
 			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
 			<version>2.0.2</version>
@@ -132,6 +128,12 @@
 			<groupId>com.stripe</groupId>
 			<artifactId>stripe-java</artifactId>
 			<version>28.3.0</version>
+		</dependency>
+
+		<!-- AllSecure Exchange Platform speaks XML (Schema V2); used to build/parse transaction payloads -->
+		<dependency>
+			<groupId>com.fasterxml.jackson.dataformat</groupId>
+			<artifactId>jackson-dataformat-xml</artifactId>
 		</dependency>
 
     <!-- Shared Entities Module -->

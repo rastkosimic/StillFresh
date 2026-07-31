@@ -1,5 +1,5 @@
 # File: notification-service/Dockerfile
-FROM openjdk:17-jdk-slim
+FROM eclipse-temurin:17-jre-jammy
 VOLUME /tmp
 COPY target/notification-service-1.0.0.jar app.jar
 

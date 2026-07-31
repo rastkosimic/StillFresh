@@ -1,0 +1,6 @@
+-- Generated from db-init/templates/init-vendor.sql.template - do not edit by hand.
+-- Run: powershell -File ./scripts/generate-init-sql.ps1
+CREATE DATABASE stillfresh_vendordb;
+CREATE USER stillfreshvendor WITH PASSWORD '__POSTGRES_PASSWORD_VENDOR__';
+GRANT ALL PRIVILEGES ON DATABASE stillfresh_vendordb TO stillfreshvendor;
+ALTER USER stillfreshvendor WITH PASSWORD '__POSTGRES_PASSWORD_VENDOR__';

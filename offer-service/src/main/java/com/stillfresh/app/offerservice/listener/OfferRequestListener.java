@@ -21,7 +21,7 @@ public class OfferRequestListener {
     public void handleOfferRequestEvent(OfferRequestEvent event) {
         logger.info("Received OfferRequestEvent: {}", event);
         try {
-            // Fetch nearby offers based on location and range
+            // Reuses optimized getNearbyOffers (bounding-box DB query), same as REST /offers/nearby
             offerService.findNearbyOffers(event.getLatitude(), event.getLongitude(), event.getRange(), event.getRequestId());
             logger.info("OfferRequestEvent processed successfully");
         } catch (Exception e) {

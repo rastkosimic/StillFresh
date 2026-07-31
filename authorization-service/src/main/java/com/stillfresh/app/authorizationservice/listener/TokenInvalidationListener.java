@@ -18,12 +18,12 @@ public class TokenInvalidationListener {
 
     @KafkaListener(topics = "${authorization.topic.name:token-invalidation-request}")
     public void handleTokenValidation(TokenRequestEvent event) {
-        logger.debug("Received TokenRequestEvent: {}", event);
+        logger.debug("Received TokenRequestEvent correlationId={}", event.getCorrelationId());
         try {
             userService.invalidateToken(event.getToken());
-            logger.debug("Token invalidation processed successfully");
+            logger.debug("Token invalidation processed successfully correlationId={}", event.getCorrelationId());
         } catch (Exception e) {
-            logger.error("Failed to process token invalidation", e);
+            logger.error("Failed to process token invalidation correlationId={}", event.getCorrelationId(), e);
         }
     }
     

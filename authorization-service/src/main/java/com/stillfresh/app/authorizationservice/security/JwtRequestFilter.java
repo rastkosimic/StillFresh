@@ -1,5 +1,6 @@
 package com.stillfresh.app.authorizationservice.security;
 
+import com.stillfresh.app.authorizationservice.service.TokenBlacklistService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -23,6 +24,9 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     @Autowired
     private UserDetailsService userDetailsService;
 
+    @Autowired
+    private TokenBlacklistService tokenBlacklistService;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
@@ -34,6 +38,16 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
         if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
             jwt = authorizationHeader.substring(7);
+
+            // Reject tokens that have been explicitly blacklisted (e.g. after logout)
+            String jti = jwtUtil.extractJti(jwt);
+            if (jti != null && tokenBlacklistService.isTokenIdBlacklisted(jti)) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\":\"Token has been invalidated\"}");
+                return;
+            }
+
             username = jwtUtil.extractUsername(jwt);
         }
 

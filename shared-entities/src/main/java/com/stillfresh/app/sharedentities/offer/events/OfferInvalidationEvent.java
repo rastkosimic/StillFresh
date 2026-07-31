@@ -1,23 +1,21 @@
 package com.stillfresh.app.sharedentities.offer.events;
 
 public class OfferInvalidationEvent {
-	
-	private int id;
-	
-	public OfferInvalidationEvent() {
-	}
 
-	public OfferInvalidationEvent(int id) {
-		this.id = id;
-	}
+    private Long id;
 
-	public int getId() {
-		return id;
-	}
+    public OfferInvalidationEvent() {
+    }
 
-	public void setId(int id) {
-		this.id = id;
-	}
+    public OfferInvalidationEvent(Long id) {
+        this.id = id;
+    }
 
+    public Long getId() {
+        return id;
+    }
 
+    public void setId(Long id) {
+        this.id = id;
+    }
 }

@@ -32,7 +32,7 @@ public class CustomVendorDetailsService implements UserDetailsService {
                     .orElseThrow(() -> new UsernameNotFoundException("Vendor not found with name: " + identifier));
         }
 
-        logger.info("Loaded Vendor Password Hash: " + vendor.getPassword());
+        logger.debug("Loaded vendor: id={}", vendor.getId());
         return new CustomVendorDetails(vendor);
     }
     
@@ -40,7 +40,7 @@ public class CustomVendorDetailsService implements UserDetailsService {
         Vendor vendor = vendorRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("Vendor not found with email: " + email));
 
-        logger.info("Loaded Vendor Password Hash: " + vendor.getPassword());
+        logger.debug("Loaded vendor: id={}", vendor.getId());
         return new CustomVendorDetails(vendor);
     }
     
@@ -56,7 +56,7 @@ public class CustomVendorDetailsService implements UserDetailsService {
                     .orElseThrow(() -> new UsernameNotFoundException("Vendor not found with name: " + identifier));
         }
 
-        logger.info("Loaded Vendor Password Hash: " + vendor.getPassword());
+        logger.debug("Loaded vendor: id={}", vendor.getId());
         return new CustomVendorDetails(vendor);
     }
 

@@ -81,6 +81,15 @@
 		</dependency>
 
 		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-database-postgresql</artifactId>
+		</dependency>
+
+		<dependency>
 			<groupId>com.github.vladimir-bukhtoyarov</groupId>
 			<artifactId>bucket4j-core</artifactId>
 			<version>7.0.0</version>
@@ -90,10 +99,6 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-configuration-processor</artifactId>
 			<optional>true</optional>
-		</dependency>
-		<dependency>
-		    <groupId>com.sendgrid</groupId>
-		    <artifactId>sendgrid-java</artifactId>
 		</dependency>
 		<dependency>
 	    <groupId>org.springdoc</groupId>
@@ -107,16 +112,22 @@
 	</dependency>
 	
 	<!-- Spring Boot Starter Data Redis -->
-	<dependency>
-	    <groupId>org.springframework.boot</groupId>
-	    <artifactId>spring-boot-starter-data-redis</artifactId>
-	</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
 	
 	<!-- Optional: For Redis client, Lettuce is default -->
-	<dependency>
-	    <groupId>io.lettuce</groupId>
-	    <artifactId>lettuce-core</artifactId>
-	</dependency>
+		<dependency>
+		    <groupId>io.lettuce</groupId>
+		    <artifactId>lettuce-core</artifactId>
+		</dependency>
+
+		<!-- Java Time (JSR-310) support for Jackson serialization over Kafka -->
+		<dependency>
+		    <groupId>com.fasterxml.jackson.datatype</groupId>
+		    <artifactId>jackson-datatype-jsr310</artifactId>
+		</dependency>
 
     <!-- Shared Entities Module -->
     <dependency>

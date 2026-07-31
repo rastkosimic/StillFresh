@@ -1,0 +1,71 @@
+server:
+  port: 8085
+
+spring:
+  main:
+    allow-bean-definition-overriding: true
+  application:
+    name: order-service
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+  datasource:
+    url: jdbc:postgresql://order-postgres:5432/stillfresh_orderdb
+    driverClassName: org.postgresql.Driver
+    username: stillfreshorders
+    password: ${POSTGRES_PASSWORD_ORDERS:}
+  jpa:
+    hibernate:
+      ddl-auto: update #update for production
+    show-sql: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKER:kafka:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+  cache:
+    type: redis
+
+  data:
+    redis:
+      host: redis
+      port: 6379
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 5
+          min-idle: 1
+      timeout: 60000
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://eureka-server:8761/eureka
+
+kafka:
+  topic:
+    vendor-stats-request: vendor-stats-request
+    vendor-stats-response: vendor-stats-response
+
+order:
+  topic:
+    fraud-flag: fraud-flag
+    order-no-show: order-no-show
+
+payment:
+  topic:
+    payment-request: payment-request
+    bank-transfer-order: bank-transfer-order
+    payment-cancel-request: payment-cancel-request
+    payment-capture-request: payment-capture-request
+    payment-captured: payment-captured-topic
+    order-payment-settled: order-payment-settled
+    bank-transfer-confirmed: bank-transfer-confirmed
+
+gateway:
+  internal:
+    secret: ${GATEWAY_INTERNAL_SECRET:stillfresh-gw-dev-secret-change-in-prod}
+

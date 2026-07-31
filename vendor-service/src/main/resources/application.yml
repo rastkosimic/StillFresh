@@ -1,50 +1,128 @@
 server:
-  port: 8083  # Port for vendor-service
+  port: 8083
+
+
+app:
+  upload:
+    dir: ${UPLOAD_DIR:/app/uploads}
+  base-url: ${APP_BASE_URL:http://localhost:8080}
+
+vendor:
+  login-url: ${VENDOR_LOGIN_URL:http://localhost:8080/auth/login}
+  chain:
+    max-locations: ${VENDOR_MAX_CHAIN_LOCATIONS:200}
+    max-workers-per-location: ${VENDOR_MAX_WORKERS_PER_LOCATION:100}
 
 spring:
   main:
     allow-bean-definition-overriding: true
   application:
     name: vendor-service
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
   datasource:
-    url: jdbc:postgresql://vendor-postgres:5432/stillfresh_vendordb  # Adjusted for vendor database
+    url: jdbc:postgresql://vendor-postgres:5432/stillfresh_vendordb
     driverClassName: org.postgresql.Driver
     username: stillfreshvendor
-    password: FreshStill011Vendor  # Adjust this to your actual vendor DB password
+    password: ${POSTGRES_PASSWORD_VENDOR:}
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: update #update for production
     show-sql: true
     database-platform: org.hibernate.dialect.PostgreSQLDialect
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKER:kafka:9092}
+    consumer:
+      group-id: vendor-service-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      auto-offset-reset: earliest
+      properties:
+        spring.json.trusted.packages: com.stillfresh.app.sharedentities.*
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    properties:
+      '[auto.create.topics.enable]': true  # Enable topic auto-creation
+    listener:
+      missing-topics-fatal: false  # Allow application startup even if topics are missing
+
+
 
   cache:
-    type: redis  # Use Redis for caching
+    type: redis
 
   data:
     redis:
-      host: redis  # The service name used in docker-compose.yml
+      host: redis
       port: 6379
       lettuce:
         pool:
           max-active: 10
           max-idle: 5
           min-idle: 1
-      timeout: 60000  # Timeout in milliseconds
-      
+      timeout: 60000
+
+mailgun:
+  api-key: ${MAILGUN_API_KEY:}
+  domain: ${MAILGUN_DOMAIN:}
+  from-email: ${MAILGUN_FROM_EMAIL:}
+  base-url: ${MAILGUN_BASE_URL:https://api.mailgun.net/v3}
+
+
 logging:
   level:
-    '[org.springframework.cache]': DEBUG  # Enable debug logging for cache operations
-
-springdoc:
-  api-docs:
-    path: /v3/api-docs
-  swagger-ui:
-    path: /swagger-ui.html
-
+    '[org.springframework.cache]': INFO
+    '[org.springdoc]': INFO
+    # Never DEBUG Feign clients — FULL/DEBUG dumps Authorization headers and credential bodies
+    feign: WARN
+    '[com.stillfresh.app.vendorservice.client]': WARN
+    
 eureka:
   client:
     serviceUrl:
-      defaultZone: http://eureka-server:8761/eureka  # Same Eureka server
+      defaultZone: http://eureka-server:8761/eureka
 
 jwt:
-  secret: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtYWtzaW1zaW1pYyIsImlhdCI6MTcyNDA4MzYxOSwiZXhwIjoxNzI0MTE5NjE5fQ.EMRkIGz1oESq7TtMSoMXsb13OaDtct1L6Qcc-0CY-pY  # Same JWT secret key
+  secret: ${JWT_SECRET:}
+  expiration: 3600000
+
+  
+google:
+  maps:
+    api-key: ${GOOGLE_MAPS_API_KEY:}
+
+feign:
+  client:
+    config:
+      default:
+        loggerLevel: BASIC
+
+kafka:
+  topic:
+    vendor-stats-request: vendor-stats-request
+    vendor-stats-response: vendor-stats-response
+
+payment:
+  topic:
+    mor-payout-data-request: mor-payout-data-request
+    mor-payout-data-response: mor-payout-data-response
+    mor-payout-status-update-request: mor-payout-status-update-request
+    mor-payout-status-update-response: mor-payout-status-update-response
+    vendor-payment-info-request: vendor-payment-info-request
+    vendor-payment-info-response: vendor-payment-info-response
+
+authorization:
+  topic:
+    password-update: password-update
+
+gateway:
+  internal:
+    secret: ${GATEWAY_INTERNAL_SECRET:stillfresh-gw-dev-secret-change-in-prod}

@@ -1,13 +1,20 @@
 package com.stillfresh.app.sharedentities.offer.events;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.OffsetDateTime;
+import java.time.LocalTime;
+
+import com.stillfresh.app.sharedentities.enums.OfferCategory;
 
 public class OfferCreationEvent {
 
     private Long vendorId;
     private String name;
-    private String vendorName;
+    // ===== Vendor display fields (snapshot from Vendor at offer creation) =====
+    private String locationName;   // Per-location label
+    private String chainName;      // Chain/brand label (null for unique vendors)
+    private String website;        // Vendor website URL
+    private String vendorImageUrl; // Vendor profile/logo image URL
     private String description;
     private double price;
     private double originalPrice;
@@ -17,25 +24,32 @@ public class OfferCreationEvent {
     private double latitude; 
     private double longitude;
     private String businessType;
+    private OfferCategory category;
     private String dietaryInfo;
     private String allergenInfo;
-    private OffsetDateTime pickupStartTime;
-    private OffsetDateTime pickupEndTime;
-    private String imageUrl;
+    private LocalDate pickupDate;
+    private LocalTime pickupStartTime;
+    private LocalTime pickupEndTime;
+    private String imageUrl; // Offer's own image URL (distinct from vendorImageUrl)
     private double rating;
     private int reviewsCount;
     private OffsetDateTime expirationDate;
+    private String country; // ISO 2-letter country code (e.g., "RS", "DE", "US")
 
     public OfferCreationEvent() {
     }
 
-	public OfferCreationEvent(Long vendorId, String vendorName, String name, String description, double price, double originalPrice,
+	public OfferCreationEvent(Long vendorId, String locationName, String chainName, String website, String vendorImageUrl,
+			String name, String description, double price, double originalPrice,
 			int quantityAvailable, String address, String zipCode, double latitude, double longitude, String businessType,
-			String dietaryInfo, String allergenInfo, OffsetDateTime pickupStartTime, OffsetDateTime pickupEndTime,
-			String imageUrl, double rating, int reviewsCount, OffsetDateTime expirationDate) {
+			OfferCategory category, String dietaryInfo, String allergenInfo, LocalDate pickupDate, LocalTime pickupStartTime, LocalTime pickupEndTime,
+			String imageUrl, double rating, int reviewsCount, OffsetDateTime expirationDate, String country) {
 		super();
 		this.vendorId = vendorId;
-		this.vendorName = vendorName;
+		this.locationName = locationName;
+		this.chainName = chainName;
+		this.website = website;
+		this.vendorImageUrl = vendorImageUrl;
 		this.name = name;
 		this.description = description;
 		this.price = price;
@@ -46,14 +60,17 @@ public class OfferCreationEvent {
 		this.latitude = latitude;
 		this.longitude = longitude;
 		this.businessType = businessType;
+		this.category = category;
 		this.dietaryInfo = dietaryInfo;
 		this.allergenInfo = allergenInfo;
+		this.pickupDate = pickupDate;
 		this.pickupStartTime = pickupStartTime;
 		this.pickupEndTime = pickupEndTime;
 		this.imageUrl = imageUrl;
 		this.rating = rating;
 		this.reviewsCount = reviewsCount;
 		this.expirationDate = expirationDate;
+		this.country = country;
 	}
 
 	public Long getVendorId() {
@@ -63,14 +80,39 @@ public class OfferCreationEvent {
 	public void setVendorId(Long vendorId) {
 		this.vendorId = vendorId;
 	}
-	
-    public String getVendorName() {
-        return vendorName;
-    }
 
-    public void setVendorName(String vendorName) {
-        this.vendorName = vendorName;
-    }
+	public String getLocationName() {
+		return locationName;
+	}
+
+	public void setLocationName(String locationName) {
+		this.locationName = locationName;
+	}
+
+	public String getChainName() {
+		return chainName;
+	}
+
+	public void setChainName(String chainName) {
+		this.chainName = chainName;
+	}
+
+	public String getWebsite() {
+		return website;
+	}
+
+	public void setWebsite(String website) {
+		this.website = website;
+	}
+
+	public String getVendorImageUrl() {
+		return vendorImageUrl;
+	}
+
+	public void setVendorImageUrl(String vendorImageUrl) {
+		this.vendorImageUrl = vendorImageUrl;
+	}
+
 	public String getName() {
 		return name;
 	}
@@ -151,6 +193,14 @@ public class OfferCreationEvent {
 		this.businessType = businessType;
 	}
 
+	public OfferCategory getCategory() {
+		return category;
+	}
+
+	public void setCategory(OfferCategory category) {
+		this.category = category;
+	}
+
 	public String getDietaryInfo() {
 		return dietaryInfo;
 	}
@@ -166,20 +216,28 @@ public class OfferCreationEvent {
 	public void setAllergenInfo(String allergenInfo) {
 		this.allergenInfo = allergenInfo;
 	}
+	
+	public LocalDate getPickupDate() {
+		return pickupDate;
+	}
+	
+	public void setPickupDate(LocalDate pickupDate) {
+		this.pickupDate = pickupDate;
+	}
 
-	public OffsetDateTime getPickupStartTime() {
+	public LocalTime getPickupStartTime() {
 		return pickupStartTime;
 	}
 
-	public void setPickupStartTime(OffsetDateTime pickupStartTime) {
+	public void setPickupStartTime(LocalTime pickupStartTime) {
 		this.pickupStartTime = pickupStartTime;
 	}
 
-	public OffsetDateTime getPickupEndTime() {
+	public LocalTime getPickupEndTime() {
 		return pickupEndTime;
 	}
 
-	public void setPickupEndTime(OffsetDateTime pickupEndTime) {
+	public void setPickupEndTime(LocalTime pickupEndTime) {
 		this.pickupEndTime = pickupEndTime;
 	}
 
@@ -213,6 +271,14 @@ public class OfferCreationEvent {
 
 	public void setExpirationDate(OffsetDateTime expirationDate) {
 		this.expirationDate = expirationDate;
+	}
+
+	public String getCountry() {
+		return country;
+	}
+
+	public void setCountry(String country) {
+		this.country = country;
 	}
 
 }

@@ -81,4 +81,10 @@ public class VendorRegisteredEvent implements Account{
     public Status getStatus() {
     	return status;
     }
+
+	@Override
+	public String toString() {
+		return "VendorRegisteredEvent{username='" + username + "', email='" + email +
+				"', status=" + status + ", role=" + role + "}";
+	}
 }

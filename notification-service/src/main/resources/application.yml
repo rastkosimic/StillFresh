@@ -1,0 +1,117 @@
+server:
+  port: 8087
+
+spring:
+  main:
+    allow-bean-definition-overriding: true
+  application:
+    name: notification-service
+  cloud:
+    config:
+      enabled: false
+      import-check:
+        enabled: false
+  datasource:
+    url: jdbc:postgresql://notification-postgres:5432/stillfresh_notificationdb
+    driverClassName: org.postgresql.Driver
+    username: stillfreshnotification
+    password: ${POSTGRES_PASSWORD_NOTIFICATION:}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    properties:
+      hibernate:
+        format_sql: true
+        hbm2ddl:
+          auto: update
+        jdbc:
+          lob:
+            non_contextual_creation: true
+  flyway:
+    enabled: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKER:kafka:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: notification-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.stillfresh.app.*"
+
+  cache:
+    type: redis
+
+  data:
+    redis:
+      host: redis
+      port: 6379
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 5
+          min-idle: 1
+      timeout: 60000
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://eureka-server:8761/eureka
+
+security:
+  oauth2:
+    resource:
+      user-info-uri: http://authorization-service:8082/userinfo
+
+jwt:
+  secret: ${JWT_SECRET:}
+  expiration: 3600000
+
+firebase:
+  credentials-path: ${FIREBASE_CREDENTIALS_PATH:/app/firebase/firebase-service-account.json}
+  project-id: stillfresh-app
+  database-url: https://stillfresh-app.firebaseio.com
+
+notification:
+  # Transactional email (Mailgun). Disabled by default; push notifications are unaffected.
+  email:
+    enabled: ${NOTIFICATION_EMAIL_ENABLED:false}
+    mailgun:
+      api-key: ${MAILGUN_API_KEY:}
+      domain: ${MAILGUN_DOMAIN:}
+      from-email: ${MAILGUN_FROM_EMAIL:}
+      base-url: ${MAILGUN_BASE_URL:https://api.mailgun.net/v3}
+  topics:
+    notification-request: notification-request
+    notification-sent: notification-sent
+    notification-failed: notification-failed
+  # Delete notifications older than this many days (retention). Default 90.
+  retention-days: 90
+  # Cron for retention job (default: 3 AM daily). Example: "0 0 3 * * ?"
+  retention-cron: "0 0 3 * * ?"
+
+order:
+  topic:
+    order-placed: order-placed
+    vendor-order-notification: vendor-order-notification
+
+payment:
+  topic:
+    payment-success: payment-success
+    payment-failure: payment-failure
+    bank-transfer-initiated: bank-transfer-initiated
+    bank-transfer-confirmed: bank-transfer-confirmed
+
+offer:
+  topic:
+    offer-created: offer-created
+    offer-updated: offer-updated
+
+gateway:
+  internal:
+    secret: ${GATEWAY_INTERNAL_SECRET:stillfresh-gw-dev-secret-change-in-prod}

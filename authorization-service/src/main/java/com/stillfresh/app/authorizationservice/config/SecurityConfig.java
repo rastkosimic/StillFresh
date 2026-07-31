@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -16,6 +17,7 @@ import com.stillfresh.app.authorizationservice.security.JwtRequestFilter;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Autowired
@@ -36,8 +38,28 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/auth/login", "/auth/register", "/auth/verify", "/auth/forgot-password", "/auth/reset-password", "/auth/refresh-token", "/admin/create-initial-admin", "/auth/check-availability", "/v3/api-docs/**", "/swagger-ui/**").permitAll()  // Open endpoints for authentication
-                .anyRequest().authenticated()  // Any other request requires authentication
+                .requestMatchers(
+                    "/auth/login", 
+                    "/auth/register", 
+                    "/auth/verify", 
+                    "/auth/forgot-password", 
+                    "/auth/reset-password", 
+                    "/auth/refresh-token", 
+                    "/auth/google-login",
+                    "/auth/oauth2/**",  // OAuth2 endpoints
+                    "/oauth2/**",  // Spring OAuth2 endpoints
+                    "/admin/create-initial-admin", 
+                    "/auth/check-availability", 
+                    "/api/auth/generate-user-id", 
+                    "/api/auth/update-user-credentials", 
+                    "/api/auth/update-user-role",  // internal role sync (e.g. VENDOR -> VENDOR_ADMIN on verification)
+                    "/api/auth/update-user-status",  // internal status sync (activate/deactivate/suspend)
+                    "/api/auth/verify-user", 
+                    "/api/auth/user/**",  // internal service-to-service user lookup and deletion
+                    "/v3/api-docs/**", 
+                    "/swagger-ui/**"
+                ).permitAll()  // Open endpoints for authentication
+                .anyRequest().authenticated()  // Any other request requires authentication (including /auth/change-password)
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));  // Stateless session management
 

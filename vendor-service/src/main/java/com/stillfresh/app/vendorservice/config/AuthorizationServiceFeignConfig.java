@@ -42,6 +42,21 @@ public class AuthorizationServiceFeignConfig {
     public RequestInterceptor requestInterceptor() {
         return requestTemplate -> {
             requestTemplate.header("Content-Type", "application/json");
+            
+            // Only add Authorization header for endpoints that require it
+            String url = requestTemplate.url();
+            if (url.contains("/api/auth/") && !url.contains("/check-availability")) {
+                // For protected endpoints, try to get the Authorization header
+                ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+                if (attributes != null) {
+                    HttpServletRequest request = attributes.getRequest();
+                    String authorizationHeader = request.getHeader("Authorization");
+                    if (authorizationHeader != null && !authorizationHeader.isBlank()) {
+                        requestTemplate.header("Authorization", authorizationHeader);
+                    }
+                }
+            }
+            // For public endpoints like /auth/check-availability, don't add Authorization header
         };
     }
 }

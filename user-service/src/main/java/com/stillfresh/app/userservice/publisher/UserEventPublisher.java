@@ -11,8 +11,10 @@ import com.stillfresh.app.sharedentities.offer.events.OfferRequestEvent;
 import com.stillfresh.app.sharedentities.order.events.OrderRequestEvent;
 import com.stillfresh.app.sharedentities.payment.events.UpdatePaymentServiceEvent;
 import com.stillfresh.app.sharedentities.shared.events.TokenRequestEvent;
+import com.stillfresh.app.sharedentities.user.events.PasswordUpdateEvent;
 import com.stillfresh.app.sharedentities.user.events.UpdateUserProfileEvent;
 import com.stillfresh.app.sharedentities.user.events.UserRegisteredEvent;
+import com.stillfresh.app.sharedentities.user.events.UserSuspendedEvent;
 import com.stillfresh.app.sharedentities.user.events.UserVerifiedEvent;
 
 @Service
@@ -29,11 +31,14 @@ public class UserEventPublisher {
     @Value("${user.topic.name:user-profile-updated}")
     private String userProfileUpdateTopic;
     
-    @Value("${authorization.topic.name:token-validation-request}")
-    private String tokenVaidationRequestTopic;
-    
     @Value("${authorization.topic.name:token-invalidation-request}")
     private String tokenInvaidationRequestTopic;
+    
+    @Value("${authorization.topic.password-update:password-update}")
+    private String passwordUpdateTopic;
+
+    @Value("${user.topic.user-suspended:user-suspended}")
+    private String userSuspendedTopic;
     
     //--------offer topics-----------
     @Value("${offer.topic.offer-request:offer-request}")
@@ -80,15 +85,6 @@ public class UserEventPublisher {
 		
 	}
 
-	public void publishTokenValidationRequest(TokenRequestEvent event) {
-        try {
-        	logger.info("Published TokenValidationEvent to Kafka topic '{}'", tokenVaidationRequestTopic);
-            kafkaTemplate.send(tokenVaidationRequestTopic, event);
-        } catch (Exception e) {
-            logger.error("Failed to publish TokenValidationEvent to Kafka", e);
-        }
-	}
-	
 	public void publishTokenInvalidationRequest(TokenRequestEvent event) {
         try {
         	logger.info("Published TokenRequestEvent to Kafka topic '{}'", tokenInvaidationRequestTopic);
@@ -130,5 +126,25 @@ public class UserEventPublisher {
 	    } catch (Exception e) {
 	        logger.error("Failed to publish UpdatePaymentServiceEvent to Kafka", e);
 	    }
+	}
+	
+	//---------------User suspension event-------------------
+	public void publishUserSuspendedEvent(UserSuspendedEvent event) {
+        try {
+        	logger.info("Published UserSuspendedEvent to Kafka topic '{}' for user ID: {}", userSuspendedTopic, event.getUserId());
+            kafkaTemplate.send(userSuspendedTopic, event);
+        } catch (Exception e) {
+            logger.error("Failed to publish UserSuspendedEvent to Kafka for user ID: {}", event.getUserId(), e);
+        }
+	}
+
+	//---------------Password update event-------------------
+	public void publishPasswordUpdateEvent(PasswordUpdateEvent event) {
+        try {
+        	logger.info("Published PasswordUpdateEvent to Kafka topic '{}' for user ID: {}", passwordUpdateTopic, event.getUserId());
+            kafkaTemplate.send(passwordUpdateTopic, event);
+        } catch (Exception e) {
+            logger.error("Failed to publish PasswordUpdateEvent to Kafka for user ID: {}", event.getUserId(), e);
+        }
 	}
 }

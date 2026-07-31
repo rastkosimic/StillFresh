@@ -7,25 +7,30 @@ import com.stillfresh.app.sharedentities.exceptions.ResourceNotFoundException;
 import com.stillfresh.app.sharedentities.offer.events.OfferRequestEvent;
 import com.stillfresh.app.sharedentities.order.events.OrderRequestEvent;
 import com.stillfresh.app.sharedentities.payment.events.UpdatePaymentServiceEvent;
-import com.stillfresh.app.sharedentities.shared.events.TokenRequestEvent;
-import com.stillfresh.app.sharedentities.shared.events.TokenValidationResponseEvent;
 import com.stillfresh.app.sharedentities.user.events.UpdateUserProfileEvent;
 import com.stillfresh.app.sharedentities.user.events.UserRegisteredEvent;
 import com.stillfresh.app.sharedentities.user.events.UserVerifiedEvent;
+import com.stillfresh.app.userservice.client.AuthorizationServiceClient;
 import com.stillfresh.app.userservice.dto.PasswordChangeRequest;
+import com.stillfresh.app.userservice.dto.DeleteAccountRequest;
 import com.stillfresh.app.userservice.listener.AvailableOfferListener;
+import com.stillfresh.app.userservice.model.DeletionFeedback;
 import com.stillfresh.app.userservice.model.User;
+import com.stillfresh.app.userservice.security.CustomUserDetails;
 import com.stillfresh.app.userservice.model.VerificationToken;
 import com.stillfresh.app.userservice.publisher.UserEventPublisher;
+import com.stillfresh.app.sharedentities.user.events.PasswordUpdateEvent;
+import com.stillfresh.app.userservice.repository.DeletionFeedbackRepository;
 import com.stillfresh.app.userservice.repository.UserRepository;
 import com.stillfresh.app.userservice.repository.VerificationTokenRepository;
-import com.stillfresh.app.userservice.security.CustomUserDetails;
 import com.stillfresh.app.userservice.security.JwtUtil;
 
 import java.io.IOException;
 import java.security.Principal;
-import java.util.Collections;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -48,6 +53,9 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class UserService {
+
+    /** Timeout (ms) for waiting for AvailableOffersEvent after publishing OfferRequestEvent. Kept low given offer-service uses DB bounding-box queries. */
+    private static final long NEARBY_OFFERS_RESPONSE_TIMEOUT_MS = 3000L;
 
     @Autowired
     private UserRepository userRepository;
@@ -73,6 +81,15 @@ public class UserService {
     @Autowired    
     private AvailableOfferListener availableOfferListener;
     
+    @Autowired
+    private AuthorizationServiceClient authorizationServiceClient;
+
+    @Autowired(required = false)
+    private FavoriteService favoriteService;
+
+    @Autowired
+    private DeletionFeedbackRepository deletionFeedbackRepository;
+
     private static final Logger logger = LoggerFactory.getLogger(UserService.class);
     
     
@@ -81,13 +98,60 @@ public class UserService {
         @CacheEvict(value = "users", key = "#user.email")
     })
     public User registerUser(User user) throws IOException {
+
+        // Local guard to prevent duplicate registration even if upstream availability check is skipped/races.
+        if (userRepository.existsByEmail(user.getEmail()) || userRepository.existsByUsername(user.getUsername())) {
+            throw new IllegalStateException("User already exists with this email or username");
+        }
         
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        // 1. First, get global user ID from authorization service
+        logger.info("Requesting global user ID for user: {}", user.getEmail());
+        Map<String, Object> idResponse = authorizationServiceClient.generateUserId(
+            new AuthorizationServiceClient.UserIdRequest(
+                user.getEmail(), 
+                user.getUsername(), 
+                Role.USER
+            )
+        );
+        
+        if (!(Boolean) idResponse.get("success")) {
+            throw new RuntimeException("Failed to generate global user ID: " + idResponse.get("message"));
+        }
+        
+        Long globalUserId = ((Number) idResponse.get("globalUserId")).longValue();
+        logger.info("Received global user ID: {} for user: {}", globalUserId, user.getEmail());
+        
+        // 2. Set the global ID and encode password
+        user.setId(globalUserId); // Override auto-generation with global ID
+        String encodedPassword = passwordEncoder.encode(user.getPassword());
+        user.setPassword(encodedPassword);
         user.setRole(Role.USER);  // Default role
         user.setStatus(Status.INACTIVE);
+
+        // Record legal acceptance. The client sends the version of the document it displayed;
+        // we stamp the acceptance timestamp server-side so it cannot be spoofed.
+        LocalDateTime acceptedAt = LocalDateTime.now();
+        if (user.getTermsVersion() != null && !user.getTermsVersion().isBlank()) {
+            user.setTermsAcceptedAt(acceptedAt);
+        }
+        if (user.getPrivacyVersion() != null && !user.getPrivacyVersion().isBlank()) {
+            user.setPrivacyAcceptedAt(acceptedAt);
+        }
         
-        logger.info("Registering user with username: {}", user.getUsername());
+        logger.info("Registering user with username: {} and global ID: {}", user.getUsername(), globalUserId);
         userRepository.save(user);
+        
+        // 3. Update credentials in authorization service
+        logger.info("Updating credentials in authorization service for global user ID: {}", globalUserId);
+        Map<String, Object> credentialResponse = authorizationServiceClient.updateUserCredentials(
+            new com.stillfresh.app.sharedentities.dto.UpdateUserCredentialsRequest(
+                globalUserId, encodedPassword, Status.INACTIVE)
+        );
+        
+        if (!(Boolean) credentialResponse.get("success")) {
+            logger.error("Failed to update credentials in authorization service: {}", credentialResponse.get("message"));
+            // Don't throw exception here as user is already saved locally
+        }
         
         // Generate and save verification token
         String token = UUID.randomUUID().toString();
@@ -115,15 +179,29 @@ public class UserService {
         user.setStatus(Status.ACTIVE);
         userRepository.save(user);
         
+        // Update authorization service with verification
+        logger.info("Verifying user in authorization service with global user ID: {}", user.getId());
+        Map<String, Object> verifyResponse = authorizationServiceClient.verifyUser(user.getId());
+        
+        if (!(Boolean) verifyResponse.get("success")) {
+            logger.error("Failed to verify user in authorization service: {}", verifyResponse.get("message"));
+            // Don't throw exception here as user is already verified locally
+        }
+        
       //Creating an event that will be utilized by authorization-service
         eventPublisher.publishUserVerifiedEvent(new UserVerifiedEvent(user.getEmail()));
-        		
+    		
         return true;
     }
     
-    @CachePut(value = "users", key = "#email")
-    public void cacheUserOnLogin(String email) {
-    	findByEmail(email);
+    /**
+     * Cache user on login.
+     * Only caches if user exists (prevents caching null values which Redis doesn't allow).
+     */
+    @CachePut(value = "users", key = "#email", unless = "#result == null")
+    public User cacheUserOnLogin(String email) {
+    	Optional<User> userOptional = findByEmail(email);
+    	return userOptional.orElse(null); // Return null if not found, but @CachePut with unless will prevent caching null
     }
     
     public void updateUser(User updatedUser) {
@@ -200,11 +278,86 @@ public class UserService {
         return authorizationHeader.substring(7); // Remove "Bearer " prefix
     }
 
+    /**
+     * Resolves the current user from the security context.
+     * When the request was authenticated by the API Gateway (GatewayTrustFilter), the principal
+     * is CustomUserDetails and we use it directly. Otherwise we fall back to extracting the JWT
+     * from the request and loading the user by email.
+     */
     public User getUserFromContext() {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            throw new RuntimeException("No authentication found in context");
+        }
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof CustomUserDetails) {
+            return ((CustomUserDetails) principal).getUser();
+        }
+        // Fallback: extract JWT from details (e.g. when not behind gateway)
         String jwt = extractTokenFromContext();
         String email = jwtUtil.extractEmail(jwt);
         return findByEmail(email)
             .orElseThrow(() -> new RuntimeException("User not found"));
+    }
+
+    @CacheEvict(value = "users", allEntries = true)
+    public User updateName(String firstName, String lastName) {
+        User user = getUserFromContext();
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        return userRepository.save(user);
+    }
+
+    @CacheEvict(value = "users", allEntries = true)
+    public User updateAddress(String address) {
+        User user = getUserFromContext();
+        user.setAddress(address);
+        return userRepository.save(user);
+    }
+
+    @CacheEvict(value = "users", allEntries = true)
+    public User updateCountry(String country) {
+        User user = getUserFromContext();
+        user.setCountry(country);
+        return userRepository.save(user);
+    }
+
+    @CacheEvict(value = "users", allEntries = true)
+    public User updateBirthday(LocalDate birthday) {
+        User user = getUserFromContext();
+        user.setBirthday(birthday);
+        return userRepository.save(user);
+    }
+
+    @CacheEvict(value = "users", allEntries = true)
+    public User updateDietaryPreference(String dietaryPreference) {
+        User user = getUserFromContext();
+        user.setDietaryPreference(dietaryPreference);
+        return userRepository.save(user);
+    }
+
+    @CacheEvict(value = "users", allEntries = true)
+    public User updatePhoneNumber(String phoneNumber) {
+        User user = getUserFromContext();
+        user.setPhoneNumber(phoneNumber);
+        return userRepository.save(user);
+    }
+
+    /**
+     * Updates the current user's profile with only the allowed optional fields from the given user.
+     * Used to support PUT /users when the client sends a partial or full profile body.
+     */
+    @CacheEvict(value = "users", allEntries = true)
+    public User updateProfileFromRequest(User partial) {
+        User user = getUserFromContext();
+        if (partial.getFirstName() != null) user.setFirstName(partial.getFirstName());
+        if (partial.getLastName() != null) user.setLastName(partial.getLastName());
+        if (partial.getAddress() != null) user.setAddress(partial.getAddress());
+        if (partial.getCountry() != null) user.setCountry(partial.getCountry());
+        if (partial.getBirthday() != null) user.setBirthday(partial.getBirthday());
+        if (partial.getDietaryPreference() != null) user.setDietaryPreference(partial.getDietaryPreference());
+        if (partial.getPhoneNumber() != null) user.setPhoneNumber(partial.getPhoneNumber());
+        return userRepository.save(user);
     }
 
     public User extractUserFromToken(String authorizationHeader) {
@@ -243,11 +396,7 @@ public class UserService {
     @CacheEvict(value = "users", key = "#user.id")
     public void changeUserPassword(User user, String newPassword) {
         // Encode the new password
-        logger.info("USERNAME: {}", user.getUsername());
-        logger.info("PASSWORD: {}", user.getPassword());
-        logger.info("EMAIL: {}", user.getEmail());
-        logger.info("ID: {}", user.getId());
-        logger.info("ACTIVE: {}", user.isActive());
+        logger.debug("Changing password for user id: {}", user.getId());
         String encodedPassword = passwordEncoder.encode(newPassword);
         user.setPassword(encodedPassword);
         userRepository.save(user);
@@ -262,6 +411,18 @@ public class UserService {
         String encodedPassword = passwordEncoder.encode(passwordChangeRequest.getNewPassword());
         user.setPassword(encodedPassword);
         userRepository.save(user);
+        
+        logger.info("Password changed in user-service database for user ID: {}, email: {}", 
+                   user.getId(), user.getEmail());
+
+        // Publish password update event to Kafka for authorization-service and other services
+        PasswordUpdateEvent passwordUpdateEvent = new PasswordUpdateEvent(
+            user.getId(),
+            user.getEmail(),
+            encodedPassword,
+            user.getRole()
+        );
+        eventPublisher.publishPasswordUpdateEvent(passwordUpdateEvent);
 
         return ResponseEntity.ok("Password changed successfully");
     }
@@ -274,14 +435,44 @@ public class UserService {
     }
 
     @CacheEvict(value = "users", allEntries = true)
-    public ResponseEntity<String> deleteUserProfile() {
+    public ResponseEntity<String> deleteUserProfile(String jwt, DeleteAccountRequest body) {
         User user = getUserFromContext();
+        if (body != null) {
+            String reason = body.getReason() != null ? body.getReason().trim() : null;
+            String message = body.getMessage() != null && !body.getMessage().isBlank() ? body.getMessage().trim() : null;
+            if (reason != null || message != null) {
+                DeletionFeedback feedback = new DeletionFeedback(user.getId(), reason, message);
+                deletionFeedbackRepository.save(feedback);
+                logger.info("Saved deletion feedback for user {}: reason={}", user.getId(), reason);
+            }
+        }
         user.setStatus(Status.DELETED);
         userRepository.save(user);
+        eventPublisher.publishUpdateUserProfileEvent(new UpdateUserProfileEvent(
+            user.getUsername(), user.getEmail(), user.getPassword(), user.getRole(), Status.DELETED));
         
-        // Invalidate the token
-        String token = extractTokenFromContext();
-        tokenBlacklistService.addTokenToBlacklist(token, 24 * 60 * 60 * 1000); // 24 hours in milliseconds
+        // Clean up user's favorites
+        try {
+            if (favoriteService != null) {
+                favoriteService.deleteAllFavorites(user.getId());
+                logger.info("Deleted all favorites for user: {}", user.getId());
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to delete favorites for user {}: {}", user.getId(), e.getMessage());
+            // Continue with user deletion even if favorites cleanup fails
+        }
+        
+        // Invalidate the token, if provided
+        if (jwt != null && !jwt.isEmpty()) {
+            try {
+                long expiryDurationInMillis = jwtUtil.getExpirationTimeInMillis(jwt) - System.currentTimeMillis();
+                tokenBlacklistService.addTokenToBlacklist(jwt, expiryDurationInMillis);
+            } catch (Exception e) {
+                logger.warn("Failed to add token to blacklist during user deletion: {}", e.getMessage());
+            }
+        } else {
+            logger.warn("No JWT provided to deleteUserProfile; skipping token blacklist.");
+        }
         
         return ResponseEntity.ok("User profile deleted successfully");
     }
@@ -298,8 +489,8 @@ public class UserService {
         eventPublisher.publishOfferRequestEvent(new OfferRequestEvent(requestId, latitude, longitude, range));
 
         try {
-            // Wait for and retrieve the response
-            return availableOfferListener.getAvailableOffers(requestId, 5000);
+            // Wait for and retrieve the response (offer-service uses optimized bounding-box query)
+            return availableOfferListener.getAvailableOffers(requestId, NEARBY_OFFERS_RESPONSE_TIMEOUT_MS);
         } catch (TimeoutException e) {
             logger.error("Timed out while waiting for AvailableOffersEvent for requestId: {}", requestId);
             future.completeExceptionally(e); // Cleanup the future
@@ -320,6 +511,7 @@ public class UserService {
             User user = findUserByUsername(principal.getName());
             orderRequest.setUserId(user.getId());
             orderRequest.setUsername(user.getUsername());
+            orderRequest.setCustomerEmail(user.getEmail());
             eventPublisher.publishOrderRequestEvent(orderRequest);
         } catch (Exception e) {
             logger.error("Failed to publish OrderRequestEvent: {}", e.getMessage());
@@ -330,7 +522,69 @@ public class UserService {
     public void publishOrderRequest(OrderRequestEvent orderRequest) {
         User user = getUserFromContext();
         orderRequest.setUserId(user.getId());
+        orderRequest.setCustomerEmail(user.getEmail());
         eventPublisher.publishOrderRequestEvent(orderRequest);
+    }
+
+    /**
+     * Create a user with a pre-set global ID (for OAuth2 registration from authorization-service)
+     * This method skips the normal registration flow and directly creates the user with the provided ID
+     */
+    @Caching(evict = {
+        @CacheEvict(value = "users", key = "#user.username"),
+        @CacheEvict(value = "users", key = "#user.email")
+    })
+    public User createOAuth2User(User user) {
+        // Validate that user has an ID set
+        if (user.getId() == null) {
+            throw new RuntimeException("User ID must be set for OAuth2 user creation");
+        }
+
+        // Check if user already exists
+        if (userRepository.existsByEmail(user.getEmail())) {
+            User existingUser = userRepository.findByEmail(user.getEmail())
+                .orElseThrow(() -> new RuntimeException("User exists but could not be retrieved"));
+            if (mergeGoogleProfile(existingUser, user)) {
+                existingUser = userRepository.save(existingUser);
+                logger.info("Merged Google profile fields for existing OAuth2 user ID: {}", existingUser.getId());
+            } else {
+                logger.warn("User with email {} already exists, skipping OAuth2 user creation", user.getEmail());
+            }
+            return existingUser;
+        }
+
+        logger.info("Creating OAuth2 user with global ID: {}, email: {}, username: {}", 
+            user.getId(), user.getEmail(), user.getUsername());
+        
+        User savedUser = userRepository.save(user);
+        
+        logger.info("Successfully created OAuth2 user in user-service with ID: {}", savedUser.getId());
+        
+        return savedUser;
+    }
+
+    /**
+     * Fills empty profile fields from Google without overwriting values the user already set.
+     */
+    private boolean mergeGoogleProfile(User existingUser, User googleProfile) {
+        boolean changed = false;
+        if (isBlank(existingUser.getFirstName()) && !isBlank(googleProfile.getFirstName())) {
+            existingUser.setFirstName(googleProfile.getFirstName());
+            changed = true;
+        }
+        if (isBlank(existingUser.getLastName()) && !isBlank(googleProfile.getLastName())) {
+            existingUser.setLastName(googleProfile.getLastName());
+            changed = true;
+        }
+        if (isBlank(existingUser.getCountry()) && !isBlank(googleProfile.getCountry())) {
+            existingUser.setCountry(googleProfile.getCountry());
+            changed = true;
+        }
+        return changed;
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
 }

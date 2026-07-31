@@ -8,7 +8,10 @@ import org.springframework.stereotype.Service;
 
 import com.stillfresh.app.sharedentities.shared.events.TokenValidationResponseEvent;
 import com.stillfresh.app.sharedentities.user.events.LoggedUserEvent;
+import com.stillfresh.app.sharedentities.user.events.PasswordUpdateEvent;
+import com.stillfresh.app.sharedentities.user.events.UpdateUserProfileEvent;
 import com.stillfresh.app.sharedentities.vendor.events.LoggedVendorEvent;
+import com.stillfresh.app.sharedentities.vendor.events.UpdateVendorProfileEvent;
 
 @Service
 public class AuthorizationEventPublisher {
@@ -23,6 +26,15 @@ public class AuthorizationEventPublisher {
     
     @Value("${authorization.topic.name:token-validation-response}")
     private String tokenVaidationResponseTopic;
+    
+    @Value("${authorization.topic.password-update:password-update}")
+    private String passwordUpdateTopic;
+
+    @Value("${user.topic.name:user-profile-updated}")
+    private String userProfileUpdatedTopic;
+
+    @Value("${vendor.topic.name:vendor-profile-updated}")
+    private String vendorProfileUpdatedTopic;
     
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
@@ -54,6 +66,33 @@ public class AuthorizationEventPublisher {
             kafkaTemplate.send(tokenVaidationResponseTopic, event);
         } catch (Exception e) {
             logger.error("Failed to publish TokenValidationResponseEvent to Kafka", e);
+        }
+	}
+	
+	public void publishPasswordUpdateEvent(PasswordUpdateEvent event) {
+        try {
+        	logger.info("Published PasswordUpdateEvent to Kafka topic '{}' for user ID: {}", passwordUpdateTopic, event.getUserId());
+            kafkaTemplate.send(passwordUpdateTopic, event);
+        } catch (Exception e) {
+            logger.error("Failed to publish PasswordUpdateEvent to Kafka for user ID: {}", event.getUserId(), e);
+        }
+	}
+
+	public void publishUpdateUserProfileEvent(UpdateUserProfileEvent event) {
+        try {
+            logger.info("Published UpdateUserProfileEvent to Kafka topic '{}' for email: {}", userProfileUpdatedTopic, event.getEmail());
+            kafkaTemplate.send(userProfileUpdatedTopic, event);
+        } catch (Exception e) {
+            logger.error("Failed to publish UpdateUserProfileEvent to Kafka for email: {}", event.getEmail(), e);
+        }
+	}
+
+	public void publishUpdateVendorProfileEvent(UpdateVendorProfileEvent event) {
+        try {
+            logger.info("Published UpdateVendorProfileEvent to Kafka topic '{}' for email: {}", vendorProfileUpdatedTopic, event.getEmail());
+            kafkaTemplate.send(vendorProfileUpdatedTopic, event);
+        } catch (Exception e) {
+            logger.error("Failed to publish UpdateVendorProfileEvent to Kafka for email: {}", event.getEmail(), e);
         }
 	}
 

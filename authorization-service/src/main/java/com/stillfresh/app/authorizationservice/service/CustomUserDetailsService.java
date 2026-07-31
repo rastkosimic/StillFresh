@@ -22,17 +22,15 @@ public class CustomUserDetailsService implements UserDetailsService {
     
     @Override
     public UserDetails loadUserByUsername(String identifier) throws UsernameNotFoundException {
-        User user;
+        // Single-query lookup: email or username, case-insensitive (at most one DB round-trip)
+        User user = userRepository.findByEmailOrUsernameIgnoreCase(identifier).orElse(null);
 
-        if (isEmail(identifier)) {
-            user = userRepository.findByEmail(identifier)
-                    .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + identifier));
-        } else {
-            user = userRepository.findByUsername(identifier)
-                    .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + identifier));
+        if (user == null) {
+            logger.warn("User not found for identifier: {}", identifier);
+            throw new UsernameNotFoundException("User not found: " + identifier);
         }
 
-        logger.info("Loaded User Password Hash: " + user.getPassword());
+        logger.debug("Loaded user: ID={}, Role={}, Status={}", user.getId(), user.getRole(), user.getStatus());
         return new CustomUserDetails(user);
     }
     
@@ -40,7 +38,6 @@ public class CustomUserDetailsService implements UserDetailsService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
 
-        logger.info("Loaded User Password Hash: " + user.getPassword());
         return new CustomUserDetails(user);
     }
 
@@ -55,7 +52,6 @@ public class CustomUserDetailsService implements UserDetailsService {
                     .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + identifier));
         }
 
-        logger.info("Loaded User Password Hash: " + user.getPassword());
         return new CustomUserDetails(user);
     }
 

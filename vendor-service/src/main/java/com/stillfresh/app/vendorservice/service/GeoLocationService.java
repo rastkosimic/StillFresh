@@ -21,7 +21,8 @@ public class GeoLocationService {
         this.geoApiContext = new GeoApiContext.Builder()
             .apiKey(apiKey)
             .build();
-        logger.info("GeoLocationService initialized with API key: {}", apiKey.substring(0, Math.min(10, apiKey.length())) + "...");
+        logger.info("GeoLocationService initialized (apiKeyConfigured={})",
+            apiKey != null && !apiKey.isBlank());
     }
 
     public double[] getCoordinates(String address) {

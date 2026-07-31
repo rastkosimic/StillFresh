@@ -17,10 +17,14 @@ import com.stillfresh.app.sharedentities.responses.ErrorResponse;
 @ControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
-    // Generic exception handler for all exceptions
+    private static final org.slf4j.Logger logger =
+            org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    // Generic exception handler for all exceptions — do not echo raw messages (may contain internals)
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> globalExceptionHandler(Exception ex, WebRequest request) {
-        return new ResponseEntity<>(new ErrorResponse("Error: " + ex.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR);
+        logger.error("Unhandled exception: {}", ex.getClass().getSimpleName(), ex);
+        return new ResponseEntity<>(new ErrorResponse("An unexpected error occurred."), HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     // Handler for IllegalArgumentException (Conflict scenarios)

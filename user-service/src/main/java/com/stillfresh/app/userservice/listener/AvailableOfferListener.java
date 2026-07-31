@@ -33,7 +33,7 @@ public class AvailableOfferListener {
         logger.info("Removed pending request for requestId: {}", requestId);
     }
 
-    @KafkaListener(topics = "${offer.topic.available-offers:available-offers}", groupId = "offer-service-group")
+    @KafkaListener(topics = "${offer.topic.available-offers:available-offers}", groupId = "user-service-group")
     public void handleAvailableOffersEvent(AvailableOffersEvent event) {
         String requestId = event.getRequestId();
         logger.info("Received AvailableOffersEvent for requestId: {}", requestId);

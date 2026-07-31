@@ -25,4 +25,9 @@ public class TokenRequestEvent {
 		this.correlationId = correlationId;
 	}
 
+	@Override
+	public String toString() {
+		return "TokenRequestEvent{correlationId='" + correlationId + "'}";
+	}
+
 }

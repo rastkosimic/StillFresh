@@ -17,5 +17,20 @@ public class PaymentUserService {
                 .map(PaymentUser::getStripeCustomerId)
                 .orElse(null);
 	}
+
+	/** Returns stored default payment method ID for the user, or null. Used to avoid Customer.retrieve when listing payment methods. */
+	public String getDefaultPaymentMethodId(String username) {
+        return paymentUserRepository.findByUsername(username)
+                .map(PaymentUser::getDefaultPaymentMethodId)
+                .orElse(null);
+	}
+
+	/** Updates the stored default payment method ID for the user (by username). */
+	public void updateDefaultPaymentMethod(String username, String defaultPaymentMethodId) {
+        paymentUserRepository.findByUsername(username).ifPresent(pu -> {
+            pu.setDefaultPaymentMethodId(defaultPaymentMethodId);
+            paymentUserRepository.save(pu);
+        });
+	}
 }
 

@@ -1,0 +1,620 @@
+ ▐▛███▜▌   Claude Code v2.1.148
+▝▜█████▛▘  Sonnet 4.6 · API Usage Billing
+  ▘▘ ▝▝    ~\git\StillFresh
+
+> Can you find the integration manual for AllSecure payment processor?          
+
+● I'll search for the AllSecure payment processor integration manual.
+
+● Web Search("AllSecure payment processor integration manual documentation")
+  ⎿  Did 1 search in 7s
+
+● Here are the official AllSecure integration resources:
+
+  Documentation Portal (asxgw.com):
+  - API Reference V3 (https://asxgw.com/documentation/apiv3) — current API
+  reference (recommended starting point)
+  - API Documentation (https://asxgw.com/documentation/api) — general API docs
+  - Gateway Documentation (https://asxgw.com/documentation/gateway) —
+  gateway-level integration guide
+  - Connector Specifics (https://asxgw.com/documentation/connectors) —
+  connector-specific details
+
+  GitHub SDKs:
+  - allsecure-pay GitHub org (https://github.com/allsecure-pay) — official
+  client libraries (PHP, likely others)
+
+  Integration overview:
+  - Hosted payment pages
+  - payment.js (embedded iFrame, PCI-DSS SAQ-A compliant)
+  - Direct API (for PCI-certified environments)
+
+  The main docs portal is at asxgw.com/documentation
+  (https://asxgw.com/documentation/gateway). If you're planning to integrate
+  AllSecure into the payment-service here as an alternative to Stripe, let me
+  know — I can help map out the implementation.
+
+  Sources:
+  - Global Payments Solution | AllSecure (https://www.allsecure.eu/)
+  - API Reference V3 :: Allsecure Gateway
+  (https://asxgw.com/documentation/apiv3)
+  - API Documentation :: Allsecure Gateway (https://asxgw.com/documentation/api)
+  - Gateway Documentation :: Allsecure Gateway
+  (https://asxgw.com/documentation/gateway)
+  - allsecure-pay · GitHub (https://github.com/allsecure-pay)
+
+✻ Brewed for 21s
+
+> Cool, familiarize yourself with integration for serbian market                
+
+● I'll fetch the main documentation pages and search for Serbia-specific details
+   in parallel.
+
+● Fetch(https://www.allsecure.rs/en/developers/api/)
+  ⎿  Error: Request failed with status code 404
+
+● Fetch(https://asxgw.com/documentation/gateway)
+  ⎿  Received 107.9KB (200 OK)
+
+● Web Search("AllSecure payment gateway Serbia integration supported cards local
+             payment methods 2025")
+  ⎿  Did 1 search in 7s
+
+● Let me dig deeper into Serbia-specific details and the connector specifics.
+
+● Fetch(https://asxgw.com/documentation/apiv3)
+  ⎿  Received 284.3KB (200 OK)
+
+● Fetch(https://asxgw.com/documentation/connectors)
+  ⎿  Received 807.5KB (200 OK)
+
+● Fetch(https://www.allsecure.rs/en/about/)
+  ⎿  Error: Request failed with status code 404
+
+● Let me check the AllSecure Serbia main site and look for DinaCard/IPS
+  specifics.
+
+● Fetch(https://www.allsecure.rs/en/)
+  ⎿  Error: Request failed with status code 404
+
+● Web Search("AllSecure Serbia DinaCard IPS QR payment integration acquirer
+            RSD")
+  ⎿  Did 1 search in 7s
+
+● Let me fetch a few more pages to get the full picture of local Serbian payment
+   methods and how AllSecure integrates them.
+
+● Fetch(https://www.allsecure.eu/services/coverage/)
+  ⎿  Received 1MB (200 OK)
+● Fetch(https://www.transfi.com/blog/serbias-payment-rails-how-they-work---dinac
+       ard-ips-real-time-payments)
+  ⎿  Received 126.7KB (200 OK)
+
+● Let me check the AllSecure EU integration page and GitHub for any
+  Serbia-specific SDK examples.
+
+● Fetch(https://www.allsecure.eu/services/payment-integration/)
+  ⎿  Received 1MB (200 OK)
+
+● Fetch(https://github.com/allsecure-pay)
+  ⎿  Received 204KB (200 OK)
+
+● Good — I now have a solid picture. Let me save this as a project memory before
+   summarizing.
+
+  Recalled 1 memory, wrote 2 memories (ctrl+o to expand)
+
+● Here's what I learned about AllSecure for the Serbian market:
+
+  ---
+  AllSecure — Serbian Market Summary
+
+  API
+
+  - Base URL: https://asxgw.com/api/v3 (JSON, TLS ≥ 1.2)
+  - Auth: HTTP Basic Auth + optional X-Signature (HMAC-SHA512) for request
+  signing
+  - Sandbox environment available for testing
+
+  Serbia-Specific Support
+
+  ┌─────────────────────────┬───────────────────────────────────────────────┐
+  │         Feature         │                    Status                     │
+  ├─────────────────────────┼───────────────────────────────────────────────┤
+  │ DinaCard                │ Explicitly supported                          │
+  ├─────────────────────────┼───────────────────────────────────────────────┤
+  │ RSD (Serbian Dinar)     │ Supported currency                            │
+  ├─────────────────────────┼───────────────────────────────────────────────┤
+  │ Western Balkans         │ Yes (dedicated acquiring partners)            │
+  │ acquiring               │                                               │
+  ├─────────────────────────┼───────────────────────────────────────────────┤
+  │ IPS QR                  │ Not confirmed in public docs — needs direct   │
+  │                         │ contact                                       │
+  └─────────────────────────┴───────────────────────────────────────────────┘
+
+  Integration Methods (best fit for StillFresh/Spring Boot)
+
+  1. payment.js — client-side card tokenization via iFrame, PCI SAQ-A; best for
+  the web checkout flow
+  2. Hosted Payment Page — full redirect, AllSecure handles all PCI; quickest to
+   ship
+  3. Server-to-Server — for recurring/scheduled charges (relevant for order
+  subscriptions)
+  4. Java SDK — allsecure-pay/exchange-java on GitHub — native fit for the
+  Spring Boot payment-service
+
+  Key Transaction Parameters
+
+  - merchantTransactionId, amount, currency (e.g. "RSD"), callbackUrl,
+  successUrl, errorUrl, cancelUrl
+  - Callbacks: async POST to callbackUrl, must return HTTP 200 + body "OK",
+  verified via X-Signature header
+
+  3DS 2.x
+
+  Controlled via extraData["3dsecure"]: OFF | OPTIONAL | MANDATORY — gateway
+  handles the challenge flow automatically.
+
+  Card-on-File / Recurring
+
+  - First charge: withRegister: true → stores reference UUID
+  - Subsequent charges: transactionIndicator: CARDONFILE + stored UUID
+
+  ---
+  Next step: The IPS QR (NBS instant payments via QR code, widely used in
+  Serbia) isn't confirmed in public docs — worth contacting AllSecure Serbia
+  directly about it. Want me to start sketching out how an AllSecure integration
+   would fit into the existing payment-service?
+
+  Sources:
+  - Gateway Documentation :: Allsecure Gateway
+  (https://asxgw.com/documentation/gateway)
+  - API Reference V3 :: Allsecure Gateway
+  (https://asxgw.com/documentation/apiv3)
+  - Quick & Easy E-commerce Payment Integration | AllSecure
+  (https://www.allsecure.eu/services/payment-integration/)
+  - Global Payment Connections - AllSecure
+  (https://www.allsecure.eu/services/coverage/)
+  - allsecure-pay · GitHub (https://github.com/allsecure-pay)
+  - Serbia's Payment Rails — DinaCard, IPS & Real-Time Payments | Transfi
+  (https://www.transfi.com/blog/serbias-payment-rails-how-they-work---dinacard-i
+  ps-real-time-payments)
+
+✻ Worked for 1m 46s
+
+> Yes, just give me an overview of AllSecure integration in StillFresh.         
+  Describe the card registration, card management, order and payment flows.     
+
+● Let me read the current payment-service structure to ground the overview in
+  real code.
+
+● Explore(Explore payment-service structure)
+  ⎿  Done (43 tool uses · 93.4k tokens · 2m 56s)
+  (ctrl+o to expand)
+
+● Good — I have a complete picture of the current service. Here's the
+  integration overview:
+
+  ---
+  AllSecure Integration Overview for StillFresh
+
+  What Changes vs. What Stays
+
+  The payment-service keeps its entire internal architecture: entities, Kafka
+  topics, ledger, payout scheduler, SEPA-XML executor, and MoR flow all remain
+  untouched. Only the Stripe SDK calls get replaced. AllSecure has no Connect
+  equivalent, so vendor onboarding becomes MoR-only for all vendors (the
+  StripeConnectController + StripeConnectService are removed).
+
+  ---
+  Card Registration Flow
+
+  Current (Stripe): Frontend sends a Stripe card token → backend calls
+  Customer.create() then paymentMethod.attach() → stores stripeCustomerId in
+  PaymentUser.
+
+  AllSecure equivalent:
+
+  Frontend (payment.js)
+    └─ tokenizes card in iFrame → sends token to backend
+
+  POST /payment/register-card
+    └─ PaymentService.registerCard()
+         └─ AllSecure API: POST /api/v3  { type: "register", transactionToken:
+  "<token>", ... }
+              └─ Response: { uuid: "<referenceUuid>", ... }
+                   └─ Store referenceUuid + card metadata (last4, expiry, brand)
+                        in new CustomerPaymentMethod entity
+
+  Because AllSecure doesn't expose a "list stored cards" API, card metadata
+  (last4, expiry, brand, isDefault flag) must be persisted locally at
+  registration time. The existing PaymentUser loses stripeCustomerId; a new
+  CustomerPaymentMethod table holds one row per stored card with its
+  referenceUuid.
+
+  transactionIndicator: SINGLE on first register. Subsequent charges use the
+  stored UUID.
+
+  ---
+  Card Management Flow
+
+  ┌──────────┬──────────────────────────────┬──────────────────────────────┐
+  │  Action  │      AllSecure API call      │           Local DB           │
+  ├──────────┼──────────────────────────────┼──────────────────────────────┤
+  │ List     │ No API call needed           │ Query CustomerPaymentMethod  │
+  │ cards    │                              │ by userId                    │
+  ├──────────┼──────────────────────────────┼──────────────────────────────┤
+  │ Get card │ No API call needed           │ Query by id                  │
+  ├──────────┼──────────────────────────────┼──────────────────────────────┤
+  │ Delete   │ POST /api/v3 type deregister │ Delete row                   │
+  │ card     │  + referenceUuid             │                              │
+  ├──────────┼──────────────────────────────┼──────────────────────────────┤
+  │ Set      │ No API call                  │ Toggle isDefault flag        │
+  │ default  │                              │                              │
+  └──────────┴──────────────────────────────┴──────────────────────────────┘
+
+  This is simpler than Stripe — card metadata is owned locally, AllSecure only
+  holds the vault reference.
+
+  ---
+  Order & Payment Flow
+
+  Current (Stripe): PaymentRequestEvent consumed → PaymentIntent.create() with
+  CaptureMethod.MANUAL + TransferData (Stripe Connect routing) →
+  PaymentSuccessEvent published → later capture() on fulfillment.
+
+  AllSecure equivalent — two-phase (Preauthorize → Capture):
+
+  Kafka: PaymentRequestEvent consumed
+    └─ PaymentService.processPaymentRequest()
+         └─ AllSecure API: POST /api/v3
+              {
+                type: "preauthorize",
+                referenceUuid: <customer's stored card UUID>,
+                transactionIndicator: "CARDONFILE",
+                amount: <gross amount>,
+                currency: "RSD",
+                merchantTransactionId: <unique per order>,
+                callbackUrl: "https://.../payment/allsecure/callback",
+                successUrl, errorUrl, cancelUrl
+              }
+         └─ Response: { returnType: "PENDING", uuid: <paymentIntentId
+  equivalent> }
+              └─ Store AllSecure UUID in PaymentTransaction.paymentIntentId
+              └─ Await async postback to /payment/allsecure/callback
+
+  POST /payment/allsecure/callback  (new endpoint)
+    └─ Verify X-Signature (HMAC-SHA512)
+    └─ If status == "OK"  → publishPaymentSuccessEvent()
+    └─ If status == "ERROR" → publishPaymentFailureEvent()
+
+  Capture (on order pickup confirmation):
+    Kafka: PaymentCaptureRequestEvent consumed
+      └─ AllSecure API: POST /api/v3
+           { type: "capture", referenceUuid: <preauthorize UUID> }
+      └─ publishPaymentCapturedEvent()
+
+  Cancel (on order expiry/cancellation):
+    Kafka: PaymentCancelRequestEvent consumed
+      └─ AllSecure API: POST /api/v3
+           { type: "void", referenceUuid: <preauthorize UUID> }
+
+  DinaCard goes through the identical flow — it's just a card scheme. The only
+  difference is currency: "RSD" and the customer having registered a DinaCard
+  rather than Visa/Mastercard.
+
+  3DS is handled transparently: if AllSecure returns returnType: "REDIRECT" (3DS
+   challenge), the response includes a redirect URL that the frontend must
+  follow. The callback then fires on completion.
+
+  ---
+  Vendor Payout Flow
+
+  AllSecure has no equivalent to Stripe Connect. All vendors use the existing
+  MoR / SEPA-XML path:
+
+  PayoutSchedulerService (daily cron)
+    └─ Creates PayoutBatch of pending LedgerEntry credits
+         └─ Admin approves → PayoutExecutionService.executeBatch()
+              └─ SepaXmlExportExecutor generates ISO 20022 pain.001 file
+                   └─ Sent to bank manually / via banking API
+
+  This path is already implemented and production-ready. The
+  StripeConnectController and StripeConnectService are simply removed.
+
+  ---
+  Structural Changes Summary
+
+  ┌─────────────────────────┬────────────────────────────────────────────────┐
+  │          What           │                     Change                     │
+  ├─────────────────────────┼────────────────────────────────────────────────┤
+  │ pom.xml                 │ Remove stripe-java, add exchange-java          │
+  │                         │ (AllSecure Java SDK)                           │
+  ├─────────────────────────┼────────────────────────────────────────────────┤
+  │ PaymentUser             │ Remove stripeCustomerId,                       │
+  │                         │ defaultPaymentMethodId                         │
+  ├─────────────────────────┼────────────────────────────────────────────────┤
+  │ New entity              │ CustomerPaymentMethod (userId, referenceUuid,  │
+  │                         │ last4, expiry, brand, isDefault)               │
+  ├─────────────────────────┼────────────────────────────────────────────────┤
+  │ PaymentService          │ Replace all Stripe.* calls with AllSecure SDK  │
+  │                         │ calls                                          │
+  ├─────────────────────────┼────────────────────────────────────────────────┤
+  │ New endpoint            │ POST /payment/allsecure/callback (webhook      │
+  │                         │ receiver + HMAC verification)                  │
+  ├─────────────────────────┼────────────────────────────────────────────────┤
+  │ StripeConnectController │ Deleted                                        │
+  ├─────────────────────────┼────────────────────────────────────────────────┤
+  │ StripeConnectService    │ Deleted                                        │
+  ├─────────────────────────┼────────────────────────────────────────────────┤
+  │ application.yml         │ Replace Stripe config with AllSecure apiUser,  │
+  │                         │ apiPassword, integrationKey, callbackUrl       │
+  └─────────────────────────┴────────────────────────────────────────────────┘
+
+  The rest — Kafka topics, PaymentTransaction, LedgerEntry, PayoutBatch,
+  BankTransferPayment, payout scheduler — remains exactly as-is.
+
+  ---
+  Want me to start with a specific part — card registration, the payment flow,
+  or the callback handler?
+
+✻ Churned for 2m 41s
+
+> I can not believe AllSecure does not store vendor bank details. Or, it has no 
+   possibility to do so. Are you sure?                                          
+
+● Fair challenge — let me check the docs more carefully rather than assume. Let
+  me look at the Payout transaction type and connector specifics.
+
+● Fetch(https://asxgw.com/documentation/apiv3)
+  ⎿  Received 284.3KB (200 OK)
+
+● Web Search("AllSecure Exchange gateway payout IBAN bank account storage vendor
+             recipient management API")
+  ⎿  Did 1 search in 8s
+
+● There's an IbanCustomer type mentioned. Let me dig into the connector
+  specifics and the PHP SDK for the full picture.
+
+● Fetch(https://asxgw.com/documentation/connectors)
+  ⎿  Received 807.5KB (200 OK)
+
+● Fetch(https://github.com/allsecure-pay/exchange-php-client)
+  ⎿  Received 305.7KB (200 OK)
+
+● Let me look directly at the PHP SDK source and the Java SDK for all available
+  transaction/data classes.
+
+● Fetch(https://github.com/allsecure-pay/exchange-php-client/tree/master/src)
+  ⎿  Received 238.3KB (200 OK)
+
+● Fetch(https://github.com/allsecure-pay/exchange-java)
+  ⎿  Received 252.2KB (200 OK)
+● Fetch(https://github.com/allsecure-pay/exchange-php-client/tree/master/src/Tra
+       nsaction)
+  ⎿  Received 244.2KB (200 OK)
+
+● Fetch(https://github.com/allsecure-pay/exchange-php-client/tree/master/src/Dat
+       a)
+  ⎿  Received 251.5KB (200 OK)
+
+● Fetch(https://github.com/allsecure-pay/exchange-php-client/tree/master/src/Cus
+       tomerProfile)
+  ⎿  Received 229.8KB (200 OK)
+
+● IbanCustomer, TransactionSplit, and CustomerProfile are all very relevant. Let
+   me read the actual source.
+
+● Fetch(https://github.com/allsecure-pay/exchange-php-client/blob/master/src/Dat
+       a/IbanCustomer.php)
+  ⎿  Received 263KB (200 OK)
+
+● Fetch(https://github.com/allsecure-pay/exchange-php-client/blob/master/src/Dat
+       a/TransactionSplit.php)
+  ⎿  Received 284.4KB (200 OK)
+
+● Fetch(https://github.com/allsecure-pay/exchange-php-client/blob/master/src/Tra
+       nsaction/Payout.php)
+  ⎿  Received 254.6KB (200 OK)
+
+● TransactionSplit with sellerMerchantGuid is very significant — that's a
+  marketplace split feature. Let me check the payment data for IBAN and the
+  CustomerProfile payment instrument.
+
+● Fetch(https://github.com/allsecure-pay/exchange-php-client/tree/master/src/Dat
+       a/PaymentData)
+  ⎿  Received 229KB (200 OK)
+
+● Fetch(https://github.com/allsecure-pay/exchange-php-client/blob/master/src/Cus
+       tomerProfile/PaymentInstrument.php)
+  ⎿  Received 238KB (200 OK)
+
+● Fetch(https://github.com/allsecure-pay/exchange-php-client/blob/master/src/Dat
+       a/PaymentData/IbanData.php)
+  ⎿  Received 266.6KB (200 OK)
+
+● Fetch(https://github.com/allsecure-pay/exchange-php-client/blob/master/src/Cus
+       tomerProfile/CustomerData.php)
+  ⎿  Received 240.1KB (200 OK)
+
+● I have enough now for a clear, honest answer.
+
+  ---
+  You were right to push back. I was too hasty. Here's what AllSecure actually
+  has:
+
+  IBAN storage does exist — CustomerProfile supports a PaymentInstrument with
+  METHOD_IBAN, backed by IbanData (IBAN, BIC, mandateId, mandateDate). You can
+  store a bank account reference and retrieve it by profile ID later.
+
+  However — important caveat: the IbanData model carries mandateId and
+  mandateDate fields. Those are SEPA DirectDebit mandate fields — meaning this
+  IBAN storage is designed for pulling money from a customer's bank account
+  (e.g. customer pays by bank debit), not for pushing money out to a vendor.
+
+  For outbound vendor payouts, AllSecure has two mechanisms:
+
+  1. Payout transaction — sends money to a bank account. The IBAN is passed
+  directly in the request (via the Customer/IbanCustomer fields), not
+  pre-registered. So you can pay to an IBAN per-transaction without needing to
+  store it in AllSecure first.
+  2. TransactionSplit — the more Stripe-Connect-like feature. A single customer
+  charge is split between the platform and one or more
+  sellerMerchantGuid-identified sub-merchants. The vendor must be registered
+  with AllSecure as a sub-merchant first and gets a sellerMerchantGuid. This
+  allows split routing at charge time, similar to Stripe's transfer_data.
+
+  Bottom line: AllSecure is not as self-service as Stripe Connect (no Express
+  account onboarding flow, no vendor dashboard), but it does support:
+  - Storing IBANs in CustomerProfile (primarily DirectDebit-oriented)
+  - Direct IBAN payouts via the Payout transaction type
+  - Marketplace payment splits to registered sub-merchants via TransactionSplit
+
+  For StillFresh vendors, the realistic path would be Payout transactions with 
+  IBAN per request (keeping vendor IBANs in StillFresh's own DB), or — if
+  AllSecure's Serbian team supports it — registering vendors as sub-merchants
+  for TransactionSplit. I'd recommend confirming the TransactionSplit
+  availability with AllSecure Serbia directly, as it's connector-dependent.
+
+  Sorry for the overconfident initial claim — the capability is there, just
+  structured differently from Stripe.
+
+  Sources:
+  - API Reference V3 :: Allsecure Gateway
+  (https://asxgw.com/documentation/apiv3)
+  - exchange-php-client/src/Data/PaymentData/IbanData.php (https://github.com/al
+  lsecure-pay/exchange-php-client/blob/master/src/Data/PaymentData/IbanData.php)
+  - exchange-php-client/src/Data/TransactionSplit.php (https://github.com/allsec
+  ure-pay/exchange-php-client/blob/master/src/Data/TransactionSplit.php)
+  - exchange-php-client/src/Transaction/Payout.php (https://github.com/allsecure
+  -pay/exchange-php-client/blob/master/src/Transaction/Payout.php)
+  - exchange-php-client/src/CustomerProfile/PaymentInstrument.php
+  (https://github.com/allsecure-pay/exchange-php-client/blob/master/src/Customer
+  Profile/PaymentInstrument.php)
+
+✻ Cooked for 2m 0s
+
+> Ok, now I am interested how would the payment process look like, once the     
+  customer marks the order as picked up. Does it go automatically, having the   
+  customer register it's credit card, and nothing else regarding the card data  
+  is required? What is the catch with 3dsecure ?                                
+
+● Let me check the order-service pickup flow before answering so I'm grounded in
+   actual code.
+
+● Explore(Explore order-service pickup and payment flow)
+  ⎿  Done (25 tool uses · 58.6k tokens · 1m 2s)
+  (ctrl+o to expand)
+
+● Good. I now have the full picture. Here's the honest answer:
+
+  ---
+  Payment Flow at Pickup — And The 3DS Catch
+
+  What happens when the customer taps "confirm pickup"
+
+  The current Stripe flow maps cleanly to AllSecure:
+
+  Customer taps "confirm pickup" in the app
+    └─ PUT /orders/{id}/confirm-pickup  (order-service)
+         └─ Publish PaymentCaptureRequestEvent  →  Kafka
+              └─ payment-service receives it
+                   └─ AllSecure API: POST /api/v3  { type: "capture",
+  referenceUuid: <preauth UUID> }
+                        └─ Publish PaymentCapturedEvent  →  Kafka
+                             └─ order-service: order.status = COMPLETED
+
+  The capture itself is fully automatic, server-to-server, zero customer 
+  interaction. No card data is touched again — AllSecure just settles the
+  already-held funds. This part works exactly as you'd want.
+
+  ---
+  Is it fully automatic after card registration?
+
+  Not quite — and this is where 3DS bites you.
+
+  The authorization (Preauthorize) happens at order placement, not at pickup.
+  That's where 3DS can interrupt the flow.
+
+  Customer places order  →  payment-service sends Preauthorize with
+  referenceUuid
+                                 │
+                      ┌──────────┴───────────────┐
+                      │                          │
+                Frictionless                Challenge required
+                (issuer approves              (issuer wants
+                 risk silently)               customer to authenticate)
+                      │                          │
+            returnType: FINISHED          returnType: REDIRECT
+            ──────────────────            ──────────────────────
+            PaymentSuccessEvent           App must open 3DS page
+            Order confirmed.              Customer must tap approve
+            Zero friction. ✓             in their banking app / enter OTP
+                                          └─ THEN callback fires
+                                          └─ PaymentSuccessEvent
+
+  So: the Preauthorize may or may not require customer interaction, depending on
+   the issuer's risk decision.
+
+  ---
+  The 3DS catch — explained properly
+
+  Frictionless vs. Challenge is decided by the card issuer, not by you.
+  AllSecure submits risk signals to the issuer, who either approves silently
+  (frictionless) or asks the customer to authenticate (challenge). You cannot
+  force frictionless — you can only improve your odds by sending richer data.
+
+  What helps get frictionless:
+  - Customer IP address
+  - Billing address on file
+  - Email
+  - Browser/device fingerprint data (3DS 2.x browser data fields)
+  - History: how long the card has been registered, number of previous
+  successful orders
+
+  The 90-day re-authentication rule — this is the second catch. Even if the
+  first order was frictionless, issuers (following Visa/Mastercard 3DS 2.x
+  rules, and PSD2 in aligned markets) require a fresh strong authentication at
+  least every 90 days for stored-card recurring/on-file charges. After 90 days,
+  the next order will force a challenge regardless of risk score.
+
+  Serbia context: Serbia is not in the EU so PSD2 does not apply directly, but
+  Visa and Mastercard enforce their own 3DS mandates globally. Serbian issuing
+  banks implement 3DS 2.x. So the challenge risk is real — just not as rigidly
+  enforced as in the EEA.
+
+  ---
+  What this means for the app
+
+  ┌───────────────────────┬─────────────────────────────────────────────────┐
+  │       Scenario        │               Customer experience               │
+  ├───────────────────────┼─────────────────────────────────────────────────┤
+  │ First order,          │ Place order → CONFIRMED. Zero friction.         │
+  │ frictionless          │                                                 │
+  ├───────────────────────┼─────────────────────────────────────────────────┤
+  │ First order, 3DS      │ Place order → app must open 3DS redirect        │
+  │ challenge             │ (WebView / browser) → customer approves in      │
+  │                       │ banking app or enters OTP → CONFIRMED           │
+  ├───────────────────────┼─────────────────────────────────────────────────┤
+  │ Repeat order within   │ Same as first frictionless case                 │
+  │ 90 days, frictionless │                                                 │
+  ├───────────────────────┼─────────────────────────────────────────────────┤
+  │ Repeat order, 90-day  │ Same as 3DS challenge case                      │
+  │ re-auth triggered     │                                                 │
+  ├───────────────────────┼─────────────────────────────────────────────────┤
+  │ Capture at pickup     │ Always silent. No 3DS, no customer interaction. │
+  └───────────────────────┴─────────────────────────────────────────────────┘
+
+  The key design implication: the order placement screen must handle returnType:
+   REDIRECT gracefully — open the 3DS URL in an in-app browser/WebView, wait for
+   AllSecure's callback, then show the confirmation screen. If you treat every
+  Preauthorize response as immediately final, 3DS challenge orders will silently
+   fail.
+
+  Set extraData["3dsecure"]: "OPTIONAL" (not MANDATORY, not OFF) — this lets
+  low-risk transactions go frictionless while still falling back to challenge
+  when the issuer demands it. OFF removes the liability shift (your platform
+  eats fraud chargebacks); MANDATORY will decline DinaCard transactions if the
+  issuer doesn't support 3DS enrollment.
+
+✻ Brewed for 2m 8s

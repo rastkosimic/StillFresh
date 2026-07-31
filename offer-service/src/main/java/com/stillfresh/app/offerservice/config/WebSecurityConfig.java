@@ -13,7 +13,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-import com.stillfresh.app.offerservice.security.JwtRequestFilter;
+import com.stillfresh.app.offerservice.security.GatewayTrustFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -21,7 +21,7 @@ public class WebSecurityConfig {
 
     @Autowired
     @Lazy
-    private JwtRequestFilter jwtRequestFilter;
+    private GatewayTrustFilter gatewayTrustFilter;
 
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
@@ -40,8 +40,11 @@ public class WebSecurityConfig {
                 .requestMatchers("/offers/**").permitAll()  // Allow access to verified vendors and users
                 .anyRequest().authenticated()
             )
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+
+        // Use GatewayTrustFilter - trusts API Gateway for authentication
+        // Gateway validates JWT and adds X-* headers, this filter extracts user info from headers
+        http.addFilterBefore(gatewayTrustFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

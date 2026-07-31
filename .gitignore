@@ -36,6 +36,16 @@ tmp/
 # Environment variable files
 .env
 
+# Generated Postgres init SQL (from db-init/templates via scripts/generate-init-sql.*)
+/init-user.sql
+/init-vendor.sql
+/init-auth.sql
+/init-offer.sql
+/init-order.sql
+/init-payment.sql
+/init-notification.sql
+/init.sql
+
 # OS-specific files
 .DS_Store
 

@@ -1,0 +1,158 @@
+server:
+  port: 8086
+
+spring:
+  main:
+    allow-bean-definition-overriding: true
+  application:
+    name: payment-service
+  datasource:
+    url: jdbc:postgresql://payment-postgres:5432/stillfresh_paymentdb
+    driverClassName: org.postgresql.Driver
+    username: stillfreshpayments
+    password: ${POSTGRES_PASSWORD_PAYMENTS:}
+  jpa:
+    hibernate:
+      ddl-auto: update # update for production
+    show-sql: true
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKER:kafka:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+    listener:
+      missing-topics-fatal: false
+
+  cache:
+    type: redis
+
+  data:
+    redis:
+      host: redis
+      port: 6379
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 5
+          min-idle: 1
+      timeout: 60000
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://eureka-server:8761/eureka
+
+# Runtime-customizable global platform fee. This value is only the seed/fallback used when the
+# platform_settings.fee_percent row is missing; the live value is editable via PUT /admin/platform/fee.
+platform:
+  fee:
+    percent: ${PLATFORM_FEE_PERCENT:10.0}
+
+# Serbian e-fiskalni fiscal receipt issuance. Disabled by default; settlement is unaffected.
+fiscal:
+  enabled: ${FISCAL_ENABLED:false}
+  endpoint-url: ${FISCAL_ENDPOINT_URL:}
+  api-key: ${FISCAL_API_KEY:}
+
+stripe:
+  apiKey: ${STRIPE_API_KEY:}
+  platform:
+    fee:
+      percent: 5.0 # Legacy key retained for backward compatibility; superseded by platform.fee.percent
+  connect:
+    returnUrl: http://localhost:8083/vendors/stripe/return
+    refreshUrl: http://localhost:8083/vendors/stripe/refresh
+    defaultCountry: DE # Default country for Stripe Connect accounts (ISO 2-letter code: US, GB, DE, etc.)
+
+# AllSecure Exchange Platform (XML Schema V2). Sandbox host differs from the production asxgw.com host.
+# Secrets (password, shared-secret) MUST be supplied via environment variables - no defaults are committed.
+allsecure:
+  base-url: ${ALLSECURE_BASE_URL:https://asxgw.paymentsandbox.cloud}
+  transaction-path: ${ALLSECURE_TRANSACTION_PATH:/transaction}
+  status-path: ${ALLSECURE_STATUS_PATH:/status}
+  api-key: ${ALLSECURE_API_KEY:genericmerchant-simulator-1}
+  shared-secret: ${ALLSECURE_SHARED_SECRET:}
+  username: ${ALLSECURE_USERNAME:genericmerchant-api-1}
+  password: ${ALLSECURE_PASSWORD:}
+  integration-key: ${ALLSECURE_INTEGRATION_KEY:sJBHPYLTFPNXjDYrQocG-1}
+  currency: ${ALLSECURE_CURRENCY:RSD}
+  # Publicly reachable base URL that AllSecure uses for callbackUrl/successUrl/errorUrl.
+  # Must be the API gateway (or ngrok tunnel to :8080), not payment-service directly.
+  public-base-url: ${ALLSECURE_PUBLIC_BASE_URL:http://localhost:8080}
+  
+jwt:
+  secret: ${JWT_SECRET:}
+  expiration: 3600000
+
+payment:
+  # Active payment provider: "stripe" (default, unchanged behaviour) or "allsecure"
+  provider: ${PAYMENT_PROVIDER:stripe}
+  topic:
+    payment-request: payment-request
+    payment-success: payment-success-topic
+    payment-failure: payment-failure-topic
+    mor-payout-data-request: mor-payout-data-request
+    mor-payout-data-response: mor-payout-data-response
+    mor-payout-status-update-request: mor-payout-status-update-request
+    mor-payout-status-update-response: mor-payout-status-update-response
+    vendor-payment-info-request: vendor-payment-info-request
+    vendor-payment-info-response: vendor-payment-info-response
+    order-payment-settled: order-payment-settled
+    payment-captured: payment-captured-topic
+    bank-transfer-order: bank-transfer-order
+    bank-transfer-initiated: bank-transfer-initiated
+    bank-transfer-confirmed: bank-transfer-confirmed
+    payment-cancel-request: payment-cancel-request
+    payment-capture-request: payment-capture-request
+
+bank-transfer:
+  platform:
+    iban: ${PLATFORM_IBAN}
+    bank-name: ${PLATFORM_BANK_NAME}
+    account-holder: ${PLATFORM_ACCOUNT_HOLDER}
+  payment-expiry-hours: ${BANK_TRANSFER_EXPIRY_HOURS:24}
+
+payout:
+  schedule:
+    # Cron: daily at 02:00 UTC. Override via PAYOUT_SCHEDULE_CRON env var.
+    cron: ${PAYOUT_SCHEDULE_CRON:0 0 2 * * *}
+  default-currency: ${PAYOUT_DEFAULT_CURRENCY:RSD}
+  # Maximum total batch amount in minor currency units (0 = no limit).
+  max-batch-amount-cents: ${PAYOUT_MAX_BATCH_AMOUNT_CENTS:0}
+  # Active payout rail: stub | sepa-xml | cmiplus
+  rail: ${PAYOUT_RAIL:stub}
+  auto:
+    enabled: ${PAYOUT_AUTO_ENABLED:true}
+    approve: ${PAYOUT_AUTO_APPROVE:true}
+    execute: ${PAYOUT_AUTO_EXECUTE:true}
+  status-poll:
+    cron: ${PAYOUT_STATUS_POLL_CRON:0 */15 * * * *}
+  executor:
+    # Legacy sync executors (used when payout.rail=stub or sepa-xml)
+    sepa-xml:
+      output-dir: ${PAYOUT_SEPA_XML_OUTPUT_DIR:/tmp/stillfresh-payouts}
+    stub:
+      fail: ${PAYOUT_EXECUTOR_STUB_FAIL:false}
+  cmiplus:
+    environment: ${CMIPLUS_ENVIRONMENT:sandbox}
+    base-url: ${CMIPLUS_BASE_URL:}
+    client-id: ${CMIPLUS_CLIENT_ID:}
+    client-secret: ${CMIPLUS_CLIENT_SECRET:}
+    keystore-path: ${CMIPLUS_KEYSTORE_PATH:}
+    keystore-password: ${CMIPLUS_KEYSTORE_PASSWORD:}
+    debtor-iban: ${PLATFORM_IBAN:}
+    debtor-name: ${PLATFORM_ACCOUNT_HOLDER:}
+    token-path: ${CMIPLUS_TOKEN_PATH:/oauth/token}
+    payment-initiation-path: ${CMIPLUS_PAYMENT_INITIATION_PATH:/payment-initiation}
+    payment-status-path: ${CMIPLUS_PAYMENT_STATUS_PATH:/payment-status}
+    account-statement-path: ${CMIPLUS_ACCOUNT_STATEMENT_PATH:/account-statement}
+    stub-mode: ${CMIPLUS_STUB_MODE:true}
+    stub-complete-delay-seconds: ${CMIPLUS_STUB_COMPLETE_DELAY_SECONDS:30}
+
+gateway:
+  internal:
+    secret: ${GATEWAY_INTERNAL_SECRET:stillfresh-gw-dev-secret-change-in-prod}

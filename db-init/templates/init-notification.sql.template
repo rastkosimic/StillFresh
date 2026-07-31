@@ -1,0 +1,55 @@
+-- Generated from db-init/templates/init-notification.sql.template - do not edit by hand.
+-- Run: powershell -File ./scripts/generate-init-sql.ps1
+-- DB user/password come from POSTGRES_USER / POSTGRES_PASSWORD via docker-compose.
+-- Create notification database
+CREATE DATABASE stillfresh_notificationdb;
+
+-- Create notifications table
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id VARCHAR(255) NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(255),
+    message TEXT,
+    body TEXT,
+    error TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    data JSONB,
+    sent BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    sent_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Create FCM tokens table
+CREATE TABLE fcm_tokens (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id VARCHAR(255) NOT NULL UNIQUE,
+    token TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Create notification preferences table
+CREATE TABLE notification_preferences (
+    id BIGSERIAL PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL UNIQUE,
+    push_enabled BOOLEAN DEFAULT TRUE,
+    email_enabled BOOLEAN DEFAULT FALSE,
+    sms_enabled BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Create enabled notification types table
+CREATE TABLE enabled_notification_types (
+    preferences_id BIGINT REFERENCES notification_preferences(id) ON DELETE CASCADE,
+    notification_type VARCHAR(50) NOT NULL,
+    PRIMARY KEY (preferences_id, notification_type)
+);
+
+-- Create indexes
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_notifications_status ON notifications(status);
+CREATE INDEX idx_notifications_created_at ON notifications(created_at);
+CREATE INDEX idx_fcm_tokens_user_id ON fcm_tokens(user_id);
+CREATE INDEX idx_notification_preferences_user_id ON notification_preferences(user_id);

@@ -34,9 +34,12 @@ public class User implements Account{
     @NotEmpty(message = "Username is required")
     private String username;
 
-    @NotEmpty(message = "Password is required")
-    @Size(min = 6, message = "Password should have at least 6 characters")
+    // Password is optional for OAuth2 users (e.g., Google sign-in)
     private String password;
+    
+    // OAuth2 provider information
+    private String oauth2Provider; // e.g., "GOOGLE"
+    private String oauth2ProviderId; // Google user ID
 
     @NotEmpty(message = "Email is required")
     @Email(message = "Email should be valid")
@@ -103,5 +106,25 @@ public class User implements Account{
     public boolean isActive() {
 	    return this.status == Status.ACTIVE;
 	}
+
+    public String getOauth2Provider() {
+        return oauth2Provider;
+    }
+
+    public void setOauth2Provider(String oauth2Provider) {
+        this.oauth2Provider = oauth2Provider;
+    }
+
+    public String getOauth2ProviderId() {
+        return oauth2ProviderId;
+    }
+
+    public void setOauth2ProviderId(String oauth2ProviderId) {
+        this.oauth2ProviderId = oauth2ProviderId;
+    }
+
+    public boolean isOAuth2User() {
+        return oauth2Provider != null && !oauth2Provider.isEmpty();
+    }
 
 }

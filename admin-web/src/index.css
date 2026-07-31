@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-green: #2e5a27;
+  --color-brand-green-dark: #23441e;
+  --color-brand-cream: #f5f0e6;
+  --color-brand-orange: #e8671a;
+  --color-brand-orange-hover: #d45a15;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background-color: var(--color-brand-cream);
+  color: #1a1a1a;
+}
+
+#root {
+  min-height: 100vh;
+}

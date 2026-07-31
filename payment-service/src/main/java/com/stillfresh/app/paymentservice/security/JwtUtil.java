@@ -37,6 +37,21 @@ public class JwtUtil {
         return extractClaim(token, claims -> claims.get("userId", Long.class));
     }
 
+    // Extract vendor ID from token
+    public Long extractVendorId(String token) {
+        Object vendorIdObj = extractClaim(token, claims -> claims.get("vendorId"));
+        if (vendorIdObj == null) {
+            return null;
+        }
+        if (vendorIdObj instanceof Number) {
+            return ((Number) vendorIdObj).longValue();
+        }
+        if (vendorIdObj instanceof String) {
+            return Long.parseLong((String) vendorIdObj);
+        }
+        return null;
+    }
+
     // Extract email from token
     public String extractEmail(String token) {
         return extractClaim(token, claims -> claims.get("email", String.class));

@@ -1,32 +1,24 @@
-version: '3.8'
-
 services:
-  # Zookeeper for Kafka coordination
-  zookeeper:
-    image: bitnami/zookeeper:3.8
-    environment:
-      - ALLOW_ANONYMOUS_LOGIN=yes
-    ports:
-      - "2181:2181"
-    networks:
-      - stillfresh_network
-
-  # Kafka Broker
+  # Kafka Broker (using KRaft mode - no Zookeeper needed)
   kafka:
-    image: bitnami/kafka:3.4.0
+    image: confluentinc/cp-kafka:latest
+    hostname: kafka
     environment:
-      - KAFKA_BROKER_ID=1
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CFG_NODE_ID=1
-      - KAFKA_KRAFT_MODE=true
-      - KAFKA_KRAFT_CLUSTER_ID=qk6eNRoKT6aFw3XkMJT-dw
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
-      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_NODE_ID=1
+      - KAFKA_PROCESS_ROLES=broker,controller
+      - KAFKA_LISTENERS=PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_LOG_DIRS=/var/lib/kafka/data
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
     ports:
       - "9092:9092"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
     networks:
       - stillfresh_network
 
@@ -36,11 +28,11 @@ services:
     environment:
       POSTGRES_DB: stillfresh_userdb
       POSTGRES_USER: stillfreshuser
-      POSTGRES_PASSWORD: FreshStill011User
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_USER}
     ports:
       - "5432:5432"
     volumes:
-      - user_postgres_data:/var/lib/postgresql/data
+      - user_postgres_data:/var/lib/postgresql
       - ./init-user.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - stillfresh_network
@@ -51,11 +43,11 @@ services:
     environment:
       POSTGRES_DB: stillfresh_vendordb
       POSTGRES_USER: stillfreshvendor
-      POSTGRES_PASSWORD: FreshStill011Vendor
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_VENDOR}
     ports:
       - "5433:5432"
     volumes:
-      - vendor_postgres_data:/var/lib/postgresql/data
+      - vendor_postgres_data:/var/lib/postgresql
       - ./init-vendor.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - stillfresh_network
@@ -66,11 +58,11 @@ services:
     environment:
       POSTGRES_DB: stillfresh_authdb
       POSTGRES_USER: stillfreshauth
-      POSTGRES_PASSWORD: FreshStill011Auth
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_AUTH}
     ports:
       - "5434:5432"
     volumes:
-      - auth_postgres_data:/var/lib/postgresql/data
+      - auth_postgres_data:/var/lib/postgresql
       - ./init-auth.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - stillfresh_network
@@ -81,11 +73,11 @@ services:
     environment:
       POSTGRES_DB: stillfresh_offerdb
       POSTGRES_USER: stillfreshoffers
-      POSTGRES_PASSWORD: FreshStill011Offers
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_OFFERS}
     ports:
       - "5435:5432"
     volumes:
-      - offer_postgres_data:/var/lib/postgresql/data
+      - offer_postgres_data:/var/lib/postgresql
       - ./init-offer.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - stillfresh_network
@@ -96,11 +88,11 @@ services:
     environment:
       POSTGRES_DB: stillfresh_orderdb
       POSTGRES_USER: stillfreshorders
-      POSTGRES_PASSWORD: FreshStill011Orders
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_ORDERS}
     ports:
       - "5436:5432"
     volumes:
-      - order_postgres_data:/var/lib/postgresql/data
+      - order_postgres_data:/var/lib/postgresql
       - ./init-order.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - stillfresh_network
@@ -111,11 +103,11 @@ services:
     environment:
       POSTGRES_DB: stillfresh_paymentdb
       POSTGRES_USER: stillfreshpayments
-      POSTGRES_PASSWORD: FreshStill011Payments
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_PAYMENTS}
     ports:
       - "5437:5432"
     volumes:
-      - payment_postgres_data:/var/lib/postgresql/data
+      - payment_postgres_data:/var/lib/postgresql
       - ./init-payment.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - stillfresh_network
@@ -126,11 +118,11 @@ services:
     environment:
       POSTGRES_DB: stillfresh_notificationdb
       POSTGRES_USER: stillfreshnotification
-      POSTGRES_PASSWORD: FreshStill011Notification
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_NOTIFICATION}
     ports:
       - "5438:5432"
     volumes:
-      - notification_postgres_data:/var/lib/postgresql/data
+      - notification_postgres_data:/var/lib/postgresql
       - ./init-notification.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - stillfresh_network
@@ -178,6 +170,10 @@ services:
       - offer-service
       - order-service
       - payment-service
+      - notification-service
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
     logging:
       driver: "json-file"
       options:
@@ -196,6 +192,15 @@ services:
       - user-postgres
       - redis
       - kafka
+    environment:
+      - KAFKA_BROKER=kafka:9092
+      - JWT_SECRET=${JWT_SECRET}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - POSTGRES_PASSWORD_USER=${POSTGRES_PASSWORD_USER}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY:-}
+      - MAILGUN_DOMAIN=${MAILGUN_DOMAIN:-}
+      - MAILGUN_FROM_EMAIL=${MAILGUN_FROM_EMAIL:-}
+      - MAILGUN_BASE_URL=${MAILGUN_BASE_URL:-https://api.mailgun.net/v3}
     logging:
       driver: "json-file"
       options:
@@ -216,6 +221,16 @@ services:
       - kafka
     environment:
       - KAFKA_BROKER=kafka:9092
+      - JWT_SECRET=${JWT_SECRET}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - POSTGRES_PASSWORD_VENDOR=${POSTGRES_PASSWORD_VENDOR}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY:-}
+      - MAILGUN_DOMAIN=${MAILGUN_DOMAIN:-}
+      - MAILGUN_FROM_EMAIL=${MAILGUN_FROM_EMAIL:-}
+      - MAILGUN_BASE_URL=${MAILGUN_BASE_URL:-https://api.mailgun.net/v3}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
+    volumes:
+      - vendor_uploads:/app/uploads
     logging:
       driver: "json-file"
       options:
@@ -236,6 +251,15 @@ services:
       - kafka
     environment:
       - KAFKA_BROKER=kafka:9092
+      - JWT_SECRET=${JWT_SECRET}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - POSTGRES_PASSWORD_AUTH=${POSTGRES_PASSWORD_AUTH}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY:-}
+      - MAILGUN_DOMAIN=${MAILGUN_DOMAIN:-}
+      - MAILGUN_FROM_EMAIL=${MAILGUN_FROM_EMAIL:-}
+      - MAILGUN_BASE_URL=${MAILGUN_BASE_URL:-https://api.mailgun.net/v3}
     logging:
       driver: "json-file"
       options:
@@ -256,6 +280,8 @@ services:
       - kafka
     environment:
       - KAFKA_BROKER=kafka:9092
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - POSTGRES_PASSWORD_OFFERS=${POSTGRES_PASSWORD_OFFERS}
     logging:
       driver: "json-file"
       options:
@@ -276,6 +302,8 @@ services:
       - kafka
     environment:
       - KAFKA_BROKER=kafka:9092
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - POSTGRES_PASSWORD_ORDERS=${POSTGRES_PASSWORD_ORDERS}
     logging:
       driver: "json-file"
       options:
@@ -284,17 +312,49 @@ services:
     networks:
       - stillfresh_network
 
-  # Payment Service
+  # Payment Service (not published on the host — reach via api-gateway :8080 only)
   payment-service:
     build: ./payment-service
-    ports:
-      - "8086:8086"
+    expose:
+      - "8086"
     depends_on:
       - eureka-server
       - payment-postgres
       - kafka
     environment:
       - KAFKA_BROKER=kafka:9092
+      - JWT_SECRET=${JWT_SECRET}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - POSTGRES_PASSWORD_PAYMENTS=${POSTGRES_PASSWORD_PAYMENTS}
+      - STRIPE_API_KEY=${STRIPE_API_KEY:-}
+      - PAYOUT_SCHEDULE_CRON=${PAYOUT_SCHEDULE_CRON:-0 0 2 * * *}
+      - PAYOUT_DEFAULT_CURRENCY=${PAYOUT_DEFAULT_CURRENCY:-RSD}
+      - PLATFORM_IBAN=${PLATFORM_IBAN}
+      - PLATFORM_BANK_NAME=${PLATFORM_BANK_NAME}
+      - PLATFORM_ACCOUNT_HOLDER=${PLATFORM_ACCOUNT_HOLDER}
+      - BANK_TRANSFER_EXPIRY_HOURS=${BANK_TRANSFER_EXPIRY_HOURS:-24}
+      - PAYOUT_MAX_BATCH_AMOUNT_CENTS=${PAYOUT_MAX_BATCH_AMOUNT_CENTS:-0}
+      - PAYOUT_RAIL=${PAYOUT_RAIL:-stub}
+      - PAYOUT_AUTO_ENABLED=${PAYOUT_AUTO_ENABLED:-true}
+      - PAYOUT_AUTO_APPROVE=${PAYOUT_AUTO_APPROVE:-true}
+      - PAYOUT_AUTO_EXECUTE=${PAYOUT_AUTO_EXECUTE:-true}
+      - PAYOUT_SEPA_XML_OUTPUT_DIR=${PAYOUT_SEPA_XML_OUTPUT_DIR:-/tmp/stillfresh-payouts}
+      - CMIPLUS_STUB_MODE=${CMIPLUS_STUB_MODE:-true}
+      - CMIPLUS_BASE_URL=${CMIPLUS_BASE_URL:-}
+      - CMIPLUS_CLIENT_ID=${CMIPLUS_CLIENT_ID:-}
+      - CMIPLUS_CLIENT_SECRET=${CMIPLUS_CLIENT_SECRET:-}
+      # Payment provider selection: "stripe" (default) or "allsecure"
+      - PAYMENT_PROVIDER=${PAYMENT_PROVIDER:-stripe}
+      # AllSecure Exchange (sandbox). Put the secrets in your .env file - do not commit them.
+      - ALLSECURE_BASE_URL=${ALLSECURE_BASE_URL:-https://asxgw.paymentsandbox.cloud}
+      - ALLSECURE_API_KEY=${ALLSECURE_API_KEY:-genericmerchant-simulator-1}
+      - ALLSECURE_SHARED_SECRET=${ALLSECURE_SHARED_SECRET:-}
+      - ALLSECURE_USERNAME=${ALLSECURE_USERNAME:-genericmerchant-api-1}
+      - ALLSECURE_PASSWORD=${ALLSECURE_PASSWORD:-}
+      - ALLSECURE_INTEGRATION_KEY=${ALLSECURE_INTEGRATION_KEY:-sJBHPYLTFPNXjDYrQocG-1}
+      - ALLSECURE_CURRENCY=${ALLSECURE_CURRENCY:-RSD}
+      # Must be a public HTTPS URL tunneling to api-gateway :8080 (ngrok). See ALLSECURE_LOCAL_DEV.md
+      - ALLSECURE_PUBLIC_BASE_URL=${ALLSECURE_PUBLIC_BASE_URL:-http://localhost:8080}
     logging:
       driver: "json-file"
       options:
@@ -315,9 +375,17 @@ services:
       - kafka
     environment:
       - KAFKA_BROKER=kafka:9092
+      - JWT_SECRET=${JWT_SECRET}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - POSTGRES_PASSWORD_NOTIFICATION=${POSTGRES_PASSWORD_NOTIFICATION}
       - FIREBASE_CREDENTIALS_PATH=/app/firebase/firebase-service-account.json
+      - NOTIFICATION_EMAIL_ENABLED=${NOTIFICATION_EMAIL_ENABLED:-false}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY:-}
+      - MAILGUN_DOMAIN=${MAILGUN_DOMAIN:-}
+      - MAILGUN_FROM_EMAIL=${MAILGUN_FROM_EMAIL:-}
+      - MAILGUN_BASE_URL=${MAILGUN_BASE_URL:-https://api.mailgun.net/v3}
     volumes:
-      - C:/Users/admin/Documents/JosSveze/stillfresh-2412f-firebase-adminsdk.json:/app/firebase/firebase-service-account.json
+      - ${FIREBASE_CREDENTIALS_HOST_PATH}:/app/firebase/firebase-service-account.json:ro
     logging:
       driver: "json-file"
       options:
@@ -326,7 +394,29 @@ services:
     networks:
       - stillfresh_network
 
+  admin-web:
+    build:
+      context: ./admin-web
+      args:
+        VITE_API_BASE_URL: http://localhost:8080
+    ports:
+      - "5173:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - stillfresh_network
+
+  marketing-web:
+    build:
+      context: .
+      dockerfile: marketing-web/Dockerfile
+    ports:
+      - "5174:80"
+    networks:
+      - stillfresh_network
+
 volumes:
+  vendor_uploads:
   user_postgres_data:
   vendor_postgres_data:
   auth_postgres_data:
@@ -334,6 +424,7 @@ volumes:
   order_postgres_data:
   payment_postgres_data:
   notification_postgres_data:
+  kafka_data:
 
 networks:
   stillfresh_network:

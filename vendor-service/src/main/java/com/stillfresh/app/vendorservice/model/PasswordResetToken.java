@@ -3,6 +3,7 @@ package com.stillfresh.app.vendorservice.model;
 import java.util.Date;
 
 import jakarta.persistence.Entity;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -21,6 +22,7 @@ public class PasswordResetToken {
 
     @OneToOne(targetEntity = Vendor.class, fetch = FetchType.EAGER)
     @JoinColumn(nullable = false, name = "vendor_id")
+    @JsonIgnore
     private Vendor vendor;
 
     private Date expiryDate;

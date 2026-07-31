@@ -76,4 +76,10 @@ public class UpdateVendorProfileEvent implements Account{
 	public boolean isActive() {
 	    return this.status == Status.ACTIVE;
 	}
+
+	@Override
+	public String toString() {
+		return "UpdateVendorProfileEvent{username='" + username + "', email='" + email +
+				"', status=" + status + ", role=" + role + "}";
+	}
 }

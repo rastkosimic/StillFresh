@@ -27,15 +27,10 @@ public class OfferDetailsResponseListener {
      */
     @KafkaListener(topics = "${offer.topic.offer-details-response:offer-details-response}", groupId = "order-service-group")
     public void handleOfferDetailsResponseEvent(OfferDetailsResponseEvent event) {
-        String requestId = event.getRequestId();
-        CompletableFuture<OfferDto> future = orderService.pendingOfferDetailsRequests.remove(requestId);
-
-        if (future != null) {
-            logger.info("Completing future for requestId: {}", requestId);
-            future.complete(event.getOfferDto());
-        } else {
-            logger.warn("No pending request found for requestId: {}", requestId);
-        }
+        logger.info("Received OfferDetailsResponseEvent for requestId: {}", event.getRequestId());
+        
+        // Store offer details for later use in finalizeOrder and complete the future
+        orderService.handleOfferDetailsResponse(event);
     }
 
 }

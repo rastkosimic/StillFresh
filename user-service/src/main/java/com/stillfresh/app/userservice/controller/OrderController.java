@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
+
 import com.stillfresh.app.sharedentities.order.events.OrderRequestEvent;
 import com.stillfresh.app.userservice.service.UserService;
 
@@ -24,10 +26,15 @@ public class OrderController {
     private UserService userService;
 
     @PostMapping("/place-order")
-    public ResponseEntity<String> placeOrder(Principal principal, @RequestBody OrderRequestEvent orderRequest) {
+    public ResponseEntity<?> placeOrder(Principal principal, @RequestBody OrderRequestEvent orderRequest) {
         try {
+            if (orderRequest.getRequestId() == null || orderRequest.getRequestId().isBlank()) {
+                orderRequest.setRequestId(UUID.randomUUID().toString());
+            }
             userService.publishOrderRequest(principal, orderRequest);
-            return ResponseEntity.ok("Order request submitted successfully.");
+            return ResponseEntity.ok(Map.of(
+                    "message", "Order request submitted successfully.",
+                    "requestId", orderRequest.getRequestId()));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Failed to place order: " + e.getMessage());
         }

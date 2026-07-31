@@ -1,0 +1,6 @@
+-- Generated from db-init/templates/init-offer.sql.template - do not edit by hand.
+-- Run: powershell -File ./scripts/generate-init-sql.ps1
+CREATE DATABASE stillfresh_offerdb;
+CREATE USER stillfreshoffers WITH PASSWORD '__POSTGRES_PASSWORD_OFFERS__';
+GRANT ALL PRIVILEGES ON DATABASE stillfresh_offerdb TO stillfreshoffers;
+ALTER USER stillfreshoffers WITH PASSWORD '__POSTGRES_PASSWORD_OFFERS__';

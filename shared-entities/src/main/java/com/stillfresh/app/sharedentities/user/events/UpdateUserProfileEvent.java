@@ -75,6 +75,9 @@ public class UpdateUserProfileEvent implements Account{
 	    return this.status == Status.ACTIVE;
 	}
 
-
-	
+	@Override
+	public String toString() {
+		return "UpdateUserProfileEvent{username='" + username + "', email='" + email +
+				"', status=" + status + ", role=" + role + "}";
+	}
 }

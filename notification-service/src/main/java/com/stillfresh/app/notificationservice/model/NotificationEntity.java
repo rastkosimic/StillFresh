@@ -25,16 +25,16 @@ public class NotificationEntity {
     @Column(nullable = false)
     private NotificationType type;
 
-    @Column(nullable = true)
+    @Column(nullable = true, length = 500)
     private String title;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "TEXT")
     private String body;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "TEXT")
     private String message;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "TEXT")
     private String error;
 
     @Enumerated(EnumType.STRING)
@@ -47,6 +47,13 @@ public class NotificationEntity {
 
     @Column(nullable = true)
     private boolean sent;
+
+    @Column(nullable = false)
+    private boolean isRead = false;
+
+    /** Soft delete: when true, notification is hidden from user listing (e.g. "deleted" in app). */
+    @Column(nullable = false)
+    private boolean deleted = false;
 
     @Column(nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -122,6 +129,22 @@ public class NotificationEntity {
 
     public void setSent(boolean sent) {
         this.sent = sent;
+    }
+
+    public boolean isRead() {
+        return isRead;
+    }
+
+    public void setRead(boolean read) {
+        isRead = read;
+    }
+
+    public boolean isDeleted() {
+        return deleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        this.deleted = deleted;
     }
 
     public OffsetDateTime getCreatedAt() {

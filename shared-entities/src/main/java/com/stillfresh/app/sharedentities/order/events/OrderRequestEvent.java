@@ -6,6 +6,13 @@ public class OrderRequestEvent {
 	private Long offerId;
 	private int quantity;
 	private String requestId;
+	/**
+	 * Payment method chosen by the customer.
+	 * Accepted values: "STRIPE_CARD" (default), "BANK_TRANSFER".
+	 */
+	private String paymentMethod = "STRIPE_CARD";
+	/** Customer email, threaded through for transactional emails (e.g. reservation nudge). */
+	private String customerEmail;
 
 	public OrderRequestEvent() {
 	}
@@ -56,6 +63,22 @@ public class OrderRequestEvent {
 
 	public void setUsername(String username) {
 		this.username = username;
+	}
+
+	public String getPaymentMethod() {
+		return paymentMethod;
+	}
+
+	public void setPaymentMethod(String paymentMethod) {
+		this.paymentMethod = paymentMethod;
+	}
+
+	public String getCustomerEmail() {
+		return customerEmail;
+	}
+
+	public void setCustomerEmail(String customerEmail) {
+		this.customerEmail = customerEmail;
 	}
 
 	// Constructors, getters, setters...

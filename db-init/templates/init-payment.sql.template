@@ -1,0 +1,6 @@
+-- Generated from db-init/templates/init-payment.sql.template - do not edit by hand.
+-- Run: powershell -File ./scripts/generate-init-sql.ps1
+CREATE DATABASE stillfresh_paymentdb;
+CREATE USER stillfreshpayments WITH PASSWORD '__POSTGRES_PASSWORD_PAYMENTS__';
+GRANT ALL PRIVILEGES ON DATABASE stillfresh_paymentdb TO stillfreshpayments;
+ALTER USER stillfreshpayments WITH PASSWORD '__POSTGRES_PASSWORD_PAYMENTS__';

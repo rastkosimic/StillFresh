@@ -1,0 +1,6 @@
+-- Generated from db-init/templates/init-order.sql.template - do not edit by hand.
+-- Run: powershell -File ./scripts/generate-init-sql.ps1
+CREATE DATABASE stillfresh_orderdb;
+CREATE USER stillfreshorders WITH PASSWORD '__POSTGRES_PASSWORD_ORDERS__';
+GRANT ALL PRIVILEGES ON DATABASE stillfresh_orderdb TO stillfreshorders;
+ALTER USER stillfreshorders WITH PASSWORD '__POSTGRES_PASSWORD_ORDERS__';

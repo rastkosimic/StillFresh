@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 
 import com.stillfresh.app.sharedentities.offer.events.AvailableOffersEvent;
 import com.stillfresh.app.sharedentities.offer.events.OfferDetailsResponseEvent;
-import com.stillfresh.app.sharedentities.shared.events.TokenRequestEvent;
 
 @Service
 public class OfferEventPublisher {
@@ -19,9 +18,6 @@ public class OfferEventPublisher {
     @Autowired
     private KafkaTemplate<String, Object> kafkaTemplate;
     
-    @Value("${authorization.topic.name:token-validation-request}")
-    private String tokenValidationRequestTopic;
-    
     //--------offer topics-----------
     @Value("${offer.topic.available-offers:available-offers}")
     private String availableOffersTopic;
@@ -29,15 +25,6 @@ public class OfferEventPublisher {
     @Value("${offer.topic.offer-details-response:offer-details-response}")
 	private String offerDetailsResponseTopic;
     
-	public void publishTokenValidationRequest(TokenRequestEvent event) {
-        try {
-        	logger.info("Published TokenValidationEvent to Kafka topic '{}'", tokenValidationRequestTopic);
-            kafkaTemplate.send(tokenValidationRequestTopic, event);
-        } catch (Exception e) {
-            logger.error("Failed to publish TokenValidationEvent to Kafka", e);
-        }
-	}
-
 	public void publishAvailableOffers(AvailableOffersEvent event) {
         try {
         	logger.info("Published AvailableOffersEvent to Kafka topic '{}'", availableOffersTopic);

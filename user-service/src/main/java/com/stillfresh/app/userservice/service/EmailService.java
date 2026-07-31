@@ -1,27 +1,34 @@
 package com.stillfresh.app.userservice.service;
 
-import com.sendgrid.Method;
-import com.sendgrid.Request;
-import com.sendgrid.Response;
-import com.sendgrid.SendGrid;
-import com.sendgrid.helpers.mail.Mail;
-import com.sendgrid.helpers.mail.objects.Content;
-import com.sendgrid.helpers.mail.objects.Email;
-import com.stillfresh.app.userservice.config.SendGridConfig;
+import com.stillfresh.app.userservice.config.MailgunConfig;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
 
 @Service
 public class EmailService {
 
-    private final SendGridConfig sendGridConfig;
+    private static final Logger logger = LoggerFactory.getLogger(EmailService.class);
+
+    private final MailgunConfig mailgunConfig;
+    private final RestTemplate restTemplate;
 
     @Autowired
-    public EmailService(SendGridConfig sendGridConfig) {
-        this.sendGridConfig = sendGridConfig;
+    public EmailService(MailgunConfig mailgunConfig) {
+        this.mailgunConfig = mailgunConfig;
+        this.restTemplate = new RestTemplate();
     }
 
     public void sendVerificationEmail(String to, String verificationUrl) throws IOException {
@@ -33,23 +40,36 @@ public class EmailService {
     }
 
     private void sendEmail(String to, String subject, String body) throws IOException {
-        Email from = new Email("rastko.seo@gmail.com");
-        Email toEmail = new Email(to);
-        Content content = new Content("text/plain", body);
-        Mail mail = new Mail(from, subject, toEmail, content);
-
-        SendGrid sg = new SendGrid(sendGridConfig.getApiKey());
-        Request request = new Request();
         try {
-            request.setMethod(Method.POST);
-            request.setEndpoint("mail/send");
-            request.setBody(mail.build());
-            Response response = sg.api(request);
-            System.out.println(response.getStatusCode());
-            System.out.println(response.getBody());
-            System.out.println(response.getHeaders());
-        } catch (IOException ex) {
-            throw ex;
+            if (mailgunConfig == null || mailgunConfig.getApiKey() == null || mailgunConfig.getDomain() == null) {
+                throw new IllegalStateException("Mailgun configuration is not properly initialized. Check environment variables.");
+            }
+            
+            String url = mailgunConfig.getBaseUrl() + "/" + mailgunConfig.getDomain() + "/messages";
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+            headers.setBasicAuth("api", mailgunConfig.getApiKey());
+            
+            MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+            formData.add("from", mailgunConfig.getFromEmail());
+            formData.add("to", to);
+            formData.add("subject", subject);
+            formData.add("text", body);
+            
+            HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(formData, headers);
+            
+            ResponseEntity<String> response = restTemplate.exchange(
+                url,
+                HttpMethod.POST,
+                request,
+                String.class
+            );
+            
+            logger.info("Mailgun email sent (status={})", response.getStatusCode());
+        } catch (Exception ex) {
+            logger.error("Failed to send email via Mailgun");
+            throw new IOException("Failed to send email via Mailgun", ex);
         }
     }
 }

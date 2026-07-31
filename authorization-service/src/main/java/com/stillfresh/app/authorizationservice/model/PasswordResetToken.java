@@ -24,6 +24,9 @@ public class PasswordResetToken {
     private User user;
 
     private Date expiryDate;
+    
+    // Store the encoded new password temporarily until verification
+    private String newPasswordHash;
 
     // Getters and Setters
 
@@ -57,5 +60,17 @@ public class PasswordResetToken {
 
     public void setExpiryDate(Date expiryDate) {
         this.expiryDate = expiryDate;
+    }
+    
+    public boolean isExpired() {
+        return expiryDate.before(new Date());
+    }
+    
+    public String getNewPasswordHash() {
+        return newPasswordHash;
+    }
+    
+    public void setNewPasswordHash(String newPasswordHash) {
+        this.newPasswordHash = newPasswordHash;
     }
 }

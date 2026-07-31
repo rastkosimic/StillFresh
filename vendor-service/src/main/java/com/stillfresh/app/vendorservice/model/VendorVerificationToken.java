@@ -2,6 +2,7 @@ package com.stillfresh.app.vendorservice.model;
 
 import jakarta.persistence.*;
 import java.util.Date;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 public class VendorVerificationToken {
@@ -14,6 +15,7 @@ public class VendorVerificationToken {
 
     @OneToOne(targetEntity = Vendor.class, fetch = FetchType.EAGER)
     @JoinColumn(nullable = false, name = "vendor_id")
+    @JsonIgnore
     private Vendor vendor;
 
     private Date expiryDate;

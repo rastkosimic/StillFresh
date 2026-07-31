@@ -6,6 +6,7 @@ import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.kafka.annotation.EnableKafka;
 
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.info.Info;
@@ -19,6 +20,7 @@ import io.swagger.v3.oas.annotations.info.Info;
 @EnableJpaRepositories(basePackages = "com.stillfresh.app.offerservice.repository")
 @OpenAPIDefinition(info = @Info(title = "Offer Service API", version = "1.0", description = "Documentation for Offer Service API"))
 @EnableFeignClients(basePackages = "com.stillfresh.app.offerservice.client")
+@EnableKafka
 public class OfferServiceApplication {
 
 	public static void main(String[] args) {

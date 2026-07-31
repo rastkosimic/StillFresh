@@ -1,18 +1,27 @@
 package com.stillfresh.app.offerservice.model;
 
 import java.time.OffsetDateTime;
-import java.time.OffsetDateTime;
+import java.time.LocalDate;
+import java.time.LocalTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
+import com.stillfresh.app.sharedentities.enums.OfferCategory;
+
 @Entity
-@Table(name = "offers")
+@Table(name = "offers", indexes = {
+    @Index(name = "idx_offer_geo", columnList = "latitude, longitude"),
+    @Index(name = "idx_offer_active_geo", columnList = "active, latitude, longitude")
+})
 public class Offer {
 
     @Id
@@ -25,9 +34,19 @@ public class Offer {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false)
-    private String vendorName;
-    
+    // ===== Vendor display snapshot (copied from Vendor at create/update time) =====
+    @Column(name = "location_name", nullable = true)
+    private String locationName;
+
+    @Column(name = "chain_name", nullable = true)
+    private String chainName;
+
+    @Column(nullable = true, length = 500)
+    private String website;
+
+    @Column(name = "vendor_image_url", nullable = true, length = 500)
+    private String vendorImageUrl;
+
     @Column(nullable = false)
     private String description;
 
@@ -39,6 +58,10 @@ public class Offer {
 
     @Column(nullable = false)
     private int quantityAvailable;
+
+    /** Original quantity when the offer was first published — never updated. Used to compute sell-through rate. */
+    @Column(name = "original_quantity", nullable = false, updatable = false)
+    private int originalQuantity;
 
     @Column(nullable = false)
     private String address;
@@ -52,8 +75,15 @@ public class Offer {
     @Column(nullable = false)
     private double longitude; // For precise geo-location
 
+    @Column(nullable = true)  // Temporarily nullable for migration - will be set to NOT NULL after migration
+    private String currency; // ISO currency code (e.g., "EUR", "RSD", "USD")
+
 	@Column(nullable = false)
     private String businessType;
+
+    @Column(nullable = true)  // Temporarily nullable for migration
+    @Enumerated(EnumType.STRING)
+    private OfferCategory category;
 
     @Column(nullable = true)
     private String dietaryInfo;
@@ -61,11 +91,14 @@ public class Offer {
     @Column(nullable = true)
     private String allergenInfo;
 
-    @Column(nullable = false)
-    private OffsetDateTime pickupStartTime;
+    @Column(nullable = true) // Temporarily nullable for migration (Option B)
+    private LocalDate pickupDate;
 
     @Column(nullable = false)
-    private OffsetDateTime pickupEndTime;
+    private LocalTime pickupStartTime;
+
+    @Column(nullable = false)
+    private LocalTime pickupEndTime;
 
     @Column(nullable = true)
     private String imageUrl;
@@ -79,6 +112,12 @@ public class Offer {
     @Column(nullable = true)
     private OffsetDateTime expirationDate;
     
+    @Column(nullable = true)
+    private LocalDate expiredAt;  // Date when offer expired (vendor's timezone)
+    
+    @Column(nullable = true)
+    private LocalDate soldOutAt;   // Date when offer was sold out (vendor's timezone)
+    
     @Column(nullable = false)
     private boolean active; // Indicates if the offer is active or not
     
@@ -87,7 +126,11 @@ public class Offer {
     
     @PrePersist
     protected void onCreate() {
-        this.createdAt = OffsetDateTime.now(); // Automatically set creation date
+        this.createdAt = OffsetDateTime.now();
+        // Snapshot the initial quantity so sell-through rate can be computed later
+        if (this.originalQuantity == 0) {
+            this.originalQuantity = this.quantityAvailable;
+        }
     }
 
 	public Long getId() {
@@ -106,12 +149,36 @@ public class Offer {
 		this.vendorId = vendorId;
 	}
 	
-    public String getVendorName() {
-        return vendorName;
+    public String getLocationName() {
+        return locationName;
     }
 
-    public void setVendorName(String vendorName) {
-        this.vendorName = vendorName;
+    public void setLocationName(String locationName) {
+        this.locationName = locationName;
+    }
+
+    public String getChainName() {
+        return chainName;
+    }
+
+    public void setChainName(String chainName) {
+        this.chainName = chainName;
+    }
+
+    public String getWebsite() {
+        return website;
+    }
+
+    public void setWebsite(String website) {
+        this.website = website;
+    }
+
+    public String getVendorImageUrl() {
+        return vendorImageUrl;
+    }
+
+    public void setVendorImageUrl(String vendorImageUrl) {
+        this.vendorImageUrl = vendorImageUrl;
     }
 
 	public String getName() {
@@ -154,6 +221,14 @@ public class Offer {
 		this.quantityAvailable = quantityAvailable;
 	}
 
+	public int getOriginalQuantity() {
+		return originalQuantity;
+	}
+
+	public void setOriginalQuantity(int originalQuantity) {
+		this.originalQuantity = originalQuantity;
+	}
+
 	public String getAddress() {
 		return address;
 	}
@@ -186,12 +261,28 @@ public class Offer {
 		this.longitude = longitude;
 	}
 
+	public String getCurrency() {
+		return currency;
+	}
+
+	public void setCurrency(String currency) {
+		this.currency = currency;
+	}
+
 	public String getBusinessType() {
 		return businessType;
 	}
 
 	public void setBusinessType(String businessType) {
 		this.businessType = businessType;
+	}
+
+	public OfferCategory getCategory() {
+		return category;
+	}
+
+	public void setCategory(OfferCategory category) {
+		this.category = category;
 	}
 
 	public String getDietaryInfo() {
@@ -209,20 +300,28 @@ public class Offer {
 	public void setAllergenInfo(String allergenInfo) {
 		this.allergenInfo = allergenInfo;
 	}
+	
+	public LocalDate getPickupDate() {
+		return pickupDate;
+	}
+	
+	public void setPickupDate(LocalDate pickupDate) {
+		this.pickupDate = pickupDate;
+	}
 
-	public OffsetDateTime getPickupStartTime() {
+	public LocalTime getPickupStartTime() {
 		return pickupStartTime;
 	}
 
-	public void setPickupStartTime(OffsetDateTime pickupStartTime) {
+	public void setPickupStartTime(LocalTime pickupStartTime) {
 		this.pickupStartTime = pickupStartTime;
 	}
 
-	public OffsetDateTime getPickupEndTime() {
+	public LocalTime getPickupEndTime() {
 		return pickupEndTime;
 	}
 
-	public void setPickupEndTime(OffsetDateTime pickupEndTime) {
+	public void setPickupEndTime(LocalTime pickupEndTime) {
 		this.pickupEndTime = pickupEndTime;
 	}
 
@@ -273,4 +372,21 @@ public class Offer {
     public void setCreatedAt(OffsetDateTime createdAt) {
         this.createdAt = createdAt;
     }
+
+	public LocalDate getExpiredAt() {
+		return expiredAt;
+	}
+
+	public void setExpiredAt(LocalDate expiredAt) {
+		this.expiredAt = expiredAt;
+	}
+
+	public LocalDate getSoldOutAt() {
+		return soldOutAt;
+	}
+
+	public void setSoldOutAt(LocalDate soldOutAt) {
+		this.soldOutAt = soldOutAt;
+	}
+
 }

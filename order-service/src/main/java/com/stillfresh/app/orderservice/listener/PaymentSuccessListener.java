@@ -18,10 +18,11 @@ public class PaymentSuccessListener {
 
 	@KafkaListener(topics = "${payment.topic.name:payment-success-topic}", groupId = "order-service-group")
 	public void handlePaymentSuccessEvent(PaymentSuccessEvent event) {
-		logger.info("Received PaymentSuccessEvent for userId: {}, offerId: {}", event.getUserId(), event.getOfferId());
+		logger.info("Received PaymentSuccessEvent for userId: {}, offerId: {}, paymentIntentId: {}", 
+				event.getUserId(), event.getOfferId(), event.getPaymentIntentId());
 		try {
-			// finalize the order
-			orderService.finalizeOrder(event.getRequestId());
+			// finalize the order with PaymentIntent ID for manual capture
+			orderService.finalizeOrder(event.getRequestId(), event.getPaymentIntentId());
 		} catch (Exception e) {
 			logger.error("Failed to process order for userId: {}, offerId: {}", event.getUserId(), event.getOfferId(),
 					e);

@@ -81,5 +81,11 @@ public class UserRegisteredEvent implements Account{
 	public Status getStatus() {
 		return status;
 	}
+
+	@Override
+	public String toString() {
+		return "UserRegisteredEvent{username='" + username + "', email='" + email +
+				"', status=" + status + ", role=" + role + "}";
+	}
 }
 

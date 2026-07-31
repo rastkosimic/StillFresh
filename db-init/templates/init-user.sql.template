@@ -1,0 +1,6 @@
+-- Generated from db-init/templates/init-user.sql.template - do not edit by hand.
+-- Run: powershell -File ./scripts/generate-init-sql.ps1
+CREATE DATABASE stillfresh_userdb;
+CREATE USER stillfreshuser WITH PASSWORD '__POSTGRES_PASSWORD_USER__';
+GRANT ALL PRIVILEGES ON DATABASE stillfresh_userdb TO stillfreshuser;
+ALTER USER stillfreshuser WITH PASSWORD '__POSTGRES_PASSWORD_USER__';

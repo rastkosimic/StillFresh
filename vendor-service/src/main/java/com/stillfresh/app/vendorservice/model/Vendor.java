@@ -1,11 +1,18 @@
 package com.stillfresh.app.vendorservice.model;
 
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+import com.stillfresh.app.sharedentities.enums.ManualPayoutMethod;
+import com.stillfresh.app.sharedentities.enums.OnboardingStatus;
+import com.stillfresh.app.sharedentities.enums.PaymentProvider;
+import com.stillfresh.app.sharedentities.enums.PayoutModel;
 import com.stillfresh.app.sharedentities.enums.Role;
 import com.stillfresh.app.sharedentities.enums.Status;
 import com.stillfresh.app.sharedentities.interfaces.Account;
+
+import java.math.BigDecimal;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -20,12 +27,15 @@ import jakarta.persistence.OneToOne;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.NotNull;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonProperty.Access;
 
 @Entity
 public class Vendor implements Account{
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @NotBlank(message = "Name cannot be blank")
@@ -41,6 +51,7 @@ public class Vendor implements Account{
     @NotBlank(message = "Phone number cannot be blank")
     private String phone;
 
+    @JsonProperty(access = Access.WRITE_ONLY)
     @Size(min = 6, message = "Password must be at least 6 characters long")
     private String password;
 
@@ -51,6 +62,7 @@ public class Vendor implements Account{
     private Status status;
 
     @OneToOne(mappedBy = "vendor", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
     private VendorVerificationToken vendorVerificationToken;
 
     private String businessType; // e.g., restaurant, bakery, supermarket, hotel
@@ -68,15 +80,143 @@ public class Vendor implements Account{
     private double averageRating; // User rating for the vendor
 
     private int reviewsCount; // Number of user reviews
-    
+
+    @Column(name = "bypass_strike_count", nullable = false)
+    private int bypassStrikeCount = 0; // Anti-abuse: cancellations flagged as potential user-vendor bypass
+
+    // Legal acceptance audit. Version is supplied by the client (document version displayed);
+    // the timestamp is stamped server-side at acceptance.
+    @Column(name = "terms_accepted_at")
+    private LocalDateTime termsAcceptedAt;
+
+    @Column(name = "terms_version")
+    private String termsVersion;
+
+    @Column(name = "privacy_accepted_at")
+    private LocalDateTime privacyAcceptedAt;
+
+    @Column(name = "privacy_version")
+    private String privacyVersion;
+
     private String imageUrl;
+
+    private String website;
+
+    @Column(columnDefinition = "TEXT")
+    private String aboutBusiness;
+
+    private String contactPerson;
     
-    @NotBlank(message = "Zip code cannot be blank")
-    private String zipCode; // For approximate searches
+    private String zipCode; // For approximate searches (optional; front-end provides coordinates)
     
-    private double latitude; // For precise geo-location
+    @NotNull(message = "Latitude is required")
+    private Double latitude; // For precise geo-location
     
-    private double longitude; // For precise geo-location
+    @NotNull(message = "Longitude is required")
+    private Double longitude; // For precise geo-location
+    
+    @JsonIgnore
+    private String stripeAccountId; // Stripe Connect account ID (e.g., "acct_xxxxx")
+    
+    @Enumerated(EnumType.STRING)
+    private PayoutModel payoutModel; // CONNECT (Stripe Connect) or MOR (Merchant of Record)
+    
+    @Enumerated(EnumType.STRING)
+    private PaymentProvider paymentProvider; // STRIPE or MOR
+    
+    private String country; // ISO 2-letter country code (e.g., "US", "RS", "DE")
+    
+    @JsonIgnore
+    private Boolean stripeSupported; // Cached flag indicating if country supports Stripe
+    
+    // MoR (Merchant of Record) specific fields
+    @JsonIgnore
+    private BigDecimal balance; // Internal balance for MoR vendors (in cents, stored as decimal)
+    
+    @JsonIgnore
+    @Enumerated(EnumType.STRING)
+    private ManualPayoutMethod manualPayoutMethod; // BANK, WISE, etc. (for MOR vendors)
+    
+    // Bank account details for MoR vendors (stored securely)
+    @JsonIgnore
+    private String bankAccountHolderName;
+    @JsonIgnore
+    private String bankAccountNumber;
+    @JsonIgnore
+    private String bankName;
+    @JsonIgnore
+    private String bankSwiftCode; // BIC/SWIFT code
+    @JsonIgnore
+    private String bankIban; // IBAN if applicable
+    
+    // ========== Chain and Onboarding Fields ==========
+    
+    /**
+     * Unique identifier for the chain (UUID format)
+     * All locations in the same chain share the same chainId
+     */
+    private String chainId;
+    
+    /**
+     * Brand/chain name (e.g., "McDonald's", "Starbucks")
+     * Null for unique vendors
+     */
+    private String chainName;
+    
+    /**
+     * Location identifier within the chain (e.g., "Downtown", "Airport", "123 Main St")
+     * For unique vendors, this can be null or same as username
+     */
+    private String locationName;
+    
+    /**
+     * True if this vendor is part of a chain (has multiple locations)
+     */
+    private Boolean isChainLocation;
+    
+    /**
+     * True if this is the headquarters location for a chain
+     * Headquarters is a selling location, not a corporate office
+     */
+    private Boolean isHeadquarters;
+    
+    /**
+     * True if this is a unique/standalone vendor (can upgrade to chain later)
+     */
+    private Boolean isUniqueVendor;
+    
+    /**
+     * Business registration ID or tax ID number
+     * Used for business verification
+     */
+    private String businessRegistrationId;
+    
+    /**
+     * Current onboarding status - tracks progress through onboarding workflow
+     */
+    @Enumerated(EnumType.STRING)
+    private OnboardingStatus onboardingStatus;
+    
+    // ========== Banking Model Fields ==========
+    
+    /**
+     * True if this location uses a shared payment account (chain model)
+     * False if each location has its own payment account (franchise model)
+     */
+    private Boolean usesSharedPaymentAccount;
+    
+    /**
+     * Points to the vendor ID of the location that owns the shared payment account
+     * Typically the headquarters location
+     * Null if usesSharedPaymentAccount is false
+     */
+    private Long sharedPaymentAccountVendorId;
+    
+    /**
+     * For VENDOR workers: Links worker to their assigned location
+     * Null for VENDOR_ADMIN accounts
+     */
+    private Long assignedLocationId;
 
     // Getters and Setters
 
@@ -210,6 +350,14 @@ public class Vendor implements Account{
         this.reviewsCount = reviewsCount;
     }
 
+    public int getBypassStrikeCount() {
+        return bypassStrikeCount;
+    }
+
+    public void setBypassStrikeCount(int bypassStrikeCount) {
+        this.bypassStrikeCount = bypassStrikeCount;
+    }
+
 	public boolean isActive() {
 		return this.status == Status.ACTIVE;
 	}
@@ -221,7 +369,31 @@ public class Vendor implements Account{
 	public void setImageUrl(String imageUrl) {
 		this.imageUrl = imageUrl;
 	}
-	
+
+	public String getWebsite() {
+		return website;
+	}
+
+	public void setWebsite(String website) {
+		this.website = website;
+	}
+
+	public String getAboutBusiness() {
+		return aboutBusiness;
+	}
+
+	public void setAboutBusiness(String aboutBusiness) {
+		this.aboutBusiness = aboutBusiness;
+	}
+
+	public String getContactPerson() {
+		return contactPerson;
+	}
+
+	public void setContactPerson(String contactPerson) {
+		this.contactPerson = contactPerson;
+	}
+
     public String getZipCode() {
 		return zipCode;
 	}
@@ -230,20 +402,242 @@ public class Vendor implements Account{
 		this.zipCode = zipCode;
 	}
 
-	public double getLatitude() {
+	public Double getLatitude() {
 		return latitude;
 	}
 
-	public void setLatitude(double latitude) {
+	public void setLatitude(Double latitude) {
 		this.latitude = latitude;
 	}
 
-	public double getLongitude() {
+	public Double getLongitude() {
 		return longitude;
 	}
 
-	public void setLongitude(double longitude) {
+	public void setLongitude(Double longitude) {
 		this.longitude = longitude;
+	}
+
+	public String getStripeAccountId() {
+		return stripeAccountId;
+	}
+
+	public void setStripeAccountId(String stripeAccountId) {
+		this.stripeAccountId = stripeAccountId;
+	}
+	
+	public PayoutModel getPayoutModel() {
+		return payoutModel;
+	}
+	
+	public void setPayoutModel(PayoutModel payoutModel) {
+		this.payoutModel = payoutModel;
+	}
+	
+	public PaymentProvider getPaymentProvider() {
+		return paymentProvider;
+	}
+	
+	public void setPaymentProvider(PaymentProvider paymentProvider) {
+		this.paymentProvider = paymentProvider;
+	}
+	
+	public String getCountry() {
+		return country;
+	}
+	
+	public void setCountry(String country) {
+		this.country = country;
+	}
+	
+	public Boolean getStripeSupported() {
+		return stripeSupported;
+	}
+	
+	public void setStripeSupported(Boolean stripeSupported) {
+		this.stripeSupported = stripeSupported;
+	}
+	
+	public BigDecimal getBalance() {
+		return balance;
+	}
+	
+	public void setBalance(BigDecimal balance) {
+		this.balance = balance;
+	}
+	
+	public ManualPayoutMethod getManualPayoutMethod() {
+		return manualPayoutMethod;
+	}
+	
+	public void setManualPayoutMethod(ManualPayoutMethod manualPayoutMethod) {
+		this.manualPayoutMethod = manualPayoutMethod;
+	}
+	
+	public String getBankAccountHolderName() {
+		return bankAccountHolderName;
+	}
+	
+	public void setBankAccountHolderName(String bankAccountHolderName) {
+		this.bankAccountHolderName = bankAccountHolderName;
+	}
+	
+	public String getBankAccountNumber() {
+		return bankAccountNumber;
+	}
+	
+	public void setBankAccountNumber(String bankAccountNumber) {
+		this.bankAccountNumber = bankAccountNumber;
+	}
+	
+	public String getBankName() {
+		return bankName;
+	}
+	
+	public void setBankName(String bankName) {
+		this.bankName = bankName;
+	}
+	
+	public String getBankSwiftCode() {
+		return bankSwiftCode;
+	}
+	
+	public void setBankSwiftCode(String bankSwiftCode) {
+		this.bankSwiftCode = bankSwiftCode;
+	}
+	
+	public String getBankIban() {
+		return bankIban;
+	}
+	
+	public void setBankIban(String bankIban) {
+		this.bankIban = bankIban;
+	}
+	
+	// ========== Chain and Onboarding Getters and Setters ==========
+	
+	public String getChainId() {
+		return chainId;
+	}
+	
+	public void setChainId(String chainId) {
+		this.chainId = chainId;
+	}
+	
+	public String getChainName() {
+		return chainName;
+	}
+	
+	public void setChainName(String chainName) {
+		this.chainName = chainName;
+	}
+	
+	public String getLocationName() {
+		return locationName;
+	}
+	
+	public void setLocationName(String locationName) {
+		this.locationName = locationName;
+	}
+	
+	public Boolean getIsChainLocation() {
+		return isChainLocation;
+	}
+	
+	public void setIsChainLocation(Boolean isChainLocation) {
+		this.isChainLocation = isChainLocation;
+	}
+	
+	public Boolean getIsHeadquarters() {
+		return isHeadquarters;
+	}
+	
+	public void setIsHeadquarters(Boolean isHeadquarters) {
+		this.isHeadquarters = isHeadquarters;
+	}
+	
+	public Boolean getIsUniqueVendor() {
+		return isUniqueVendor;
+	}
+	
+	public void setIsUniqueVendor(Boolean isUniqueVendor) {
+		this.isUniqueVendor = isUniqueVendor;
+	}
+	
+	public String getBusinessRegistrationId() {
+		return businessRegistrationId;
+	}
+	
+	public void setBusinessRegistrationId(String businessRegistrationId) {
+		this.businessRegistrationId = businessRegistrationId;
+	}
+	
+	public OnboardingStatus getOnboardingStatus() {
+		return onboardingStatus;
+	}
+	
+	public void setOnboardingStatus(OnboardingStatus onboardingStatus) {
+		this.onboardingStatus = onboardingStatus;
+	}
+	
+	// ========== Banking Model Getters and Setters ==========
+	
+	public Boolean getUsesSharedPaymentAccount() {
+		return usesSharedPaymentAccount;
+	}
+	
+	public void setUsesSharedPaymentAccount(Boolean usesSharedPaymentAccount) {
+		this.usesSharedPaymentAccount = usesSharedPaymentAccount;
+	}
+	
+	public Long getSharedPaymentAccountVendorId() {
+		return sharedPaymentAccountVendorId;
+	}
+	
+	public void setSharedPaymentAccountVendorId(Long sharedPaymentAccountVendorId) {
+		this.sharedPaymentAccountVendorId = sharedPaymentAccountVendorId;
+	}
+	
+	public Long getAssignedLocationId() {
+		return assignedLocationId;
+	}
+	
+	public void setAssignedLocationId(Long assignedLocationId) {
+		this.assignedLocationId = assignedLocationId;
+	}
+
+	// ========== Legal Acceptance Getters and Setters ==========
+
+	public LocalDateTime getTermsAcceptedAt() {
+		return termsAcceptedAt;
+	}
+
+	public void setTermsAcceptedAt(LocalDateTime termsAcceptedAt) {
+		this.termsAcceptedAt = termsAcceptedAt;
+	}
+
+	public String getTermsVersion() {
+		return termsVersion;
+	}
+
+	public void setTermsVersion(String termsVersion) {
+		this.termsVersion = termsVersion;
+	}
+
+	public LocalDateTime getPrivacyAcceptedAt() {
+		return privacyAcceptedAt;
+	}
+
+	public void setPrivacyAcceptedAt(LocalDateTime privacyAcceptedAt) {
+		this.privacyAcceptedAt = privacyAcceptedAt;
+	}
+
+	public String getPrivacyVersion() {
+		return privacyVersion;
+	}
+
+	public void setPrivacyVersion(String privacyVersion) {
+		this.privacyVersion = privacyVersion;
 	}
 }
 

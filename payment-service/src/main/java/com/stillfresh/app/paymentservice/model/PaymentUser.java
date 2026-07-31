@@ -24,6 +24,10 @@ public class PaymentUser {
     @Column(nullable = false, unique = true)
     private String stripeCustomerId; // 🔹 Stripe customer ID
 
+    /** Stripe default payment method ID (pm_xxx). Avoids Customer.retrieve when listing payment methods. */
+    @Column(name = "default_payment_method_id")
+    private String defaultPaymentMethodId;
+
     public PaymentUser() {}
 
     public PaymentUser(String username, String stripeCustomerId) {
@@ -49,5 +53,13 @@ public class PaymentUser {
 
     public void setStripeCustomerId(String stripeCustomerId) {
         this.stripeCustomerId = stripeCustomerId;
+    }
+
+    public String getDefaultPaymentMethodId() {
+        return defaultPaymentMethodId;
+    }
+
+    public void setDefaultPaymentMethodId(String defaultPaymentMethodId) {
+        this.defaultPaymentMethodId = defaultPaymentMethodId;
     }
 }

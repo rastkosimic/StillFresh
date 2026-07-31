@@ -4,6 +4,7 @@ public class PaymentSuccessEvent {
     private String requestId;
     private Long userId;
     private Long offerId;
+    private String paymentIntentId;  // Stripe PaymentIntent ID for manual capture/cancel
 
     public PaymentSuccessEvent() {}
 
@@ -11,6 +12,13 @@ public class PaymentSuccessEvent {
         this.requestId = requestId;
         this.userId = userId;
         this.offerId = offerId;
+    }
+
+    public PaymentSuccessEvent(String requestId, Long userId, Long offerId, String paymentIntentId) {
+        this.requestId = requestId;
+        this.userId = userId;
+        this.offerId = offerId;
+        this.paymentIntentId = paymentIntentId;
     }
 
     public String getRequestId() {
@@ -37,12 +45,21 @@ public class PaymentSuccessEvent {
         this.offerId = offerId;
     }
 
+    public String getPaymentIntentId() {
+        return paymentIntentId;
+    }
+
+    public void setPaymentIntentId(String paymentIntentId) {
+        this.paymentIntentId = paymentIntentId;
+    }
+
     @Override
     public String toString() {
         return "PaymentSuccessEvent{" +
                 "requestId='" + requestId + '\'' +
                 ", userId=" + userId +
                 ", offerId=" + offerId +
+                ", paymentIntentId='" + paymentIntentId + '\'' +
                 '}';
     }
 }

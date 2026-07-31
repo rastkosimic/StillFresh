@@ -1,18 +1,32 @@
 package com.stillfresh.app.sharedentities.dto;
 
 import java.io.Serializable;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.OffsetDateTime;
+import java.time.LocalTime;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.stillfresh.app.sharedentities.enums.OfferCategory;
+import com.stillfresh.app.sharedentities.enums.PickupDaySlot;
+import com.stillfresh.app.sharedentities.enums.PickupMealSlot;
+import com.stillfresh.app.sharedentities.jackson.MultiFormatLocalDateDeserializer;
+
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class OfferDto implements Serializable{
     
 	private static final long serialVersionUID = 1L;
 
 	private Long id;  // Offer ID for reference
-	
-	private String vendorName;
+
+	private Long vendorId;
+
+	// ===== Vendor display fields (snapshot) =====
+	private String locationName;   // Per-location label (e.g. "Downtown branch")
+	private String chainName;      // Brand/chain label (e.g. "Starbucks"); null for unique vendors
+	private String website;        // Vendor website URL
+	private String vendorImageUrl; // Vendor profile/logo image URL
 
     private String name;  // Offer name/title
     
@@ -22,13 +36,14 @@ public class OfferDto implements Serializable{
     
     private double originalPrice;  // Original price before discount
     
-    private int quantityAvailable;  // Number of items available
+    private int quantityAvailable;  // Number of items available (current remaining)
+    private int originalQuantity;   // Quantity when first published — for sell-through rate
     
     private String dietaryInfo;  // Optional dietary information (e.g., calorie count)
     
     private String allergenInfo;  // Optional allergen information (e.g., contains gluten)
     
-    private String imageUrl;  // Optional URL of the offer image
+    private String imageUrl;  // Optional URL of the offer's own image (distinct from vendorImageUrl)
     
     private double rating;  // Average user rating for the offer/vendor
     
@@ -48,23 +63,45 @@ public class OfferDto implements Serializable{
 	
 	private double longitude;  // Precise longitude for geo-location
 	
+	private String currency;  // ISO currency code (e.g., "EUR", "RSD", "USD")
+	
 	private String businessType;  // Type of business associated with the offer
 	
-	private OffsetDateTime pickupStartTime;  // Start time for offer pickup
+	private OfferCategory category;  // Category of the offer (e.g., MEALS, GROCERIES)
 	
-	private OffsetDateTime pickupEndTime;  // End time for offer pickup
+	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
+	@JsonDeserialize(using = MultiFormatLocalDateDeserializer.class)
+	private LocalDate pickupDate; // Pickup date selected by vendor (Option B). Accepts multiple input formats; outputs ISO yyyy-MM-dd.
+	
+	private LocalTime pickupStartTime;  // Start time for offer pickup
+	
+	private LocalTime pickupEndTime;  // End time for offer pickup
+	
+	// ===== Derived (non-persisted) fields for UI grouping =====
+	private PickupDaySlot pickupDaySlot;   // TODAY / TOMORROW / FUTURE / PAST
+	private PickupMealSlot pickupMealSlot; // BREAKFAST / LUNCH / DINNER / OTHER
+	private boolean collectNow;            // true if now is within pickup window (today)
+	
+	// ===== Status flags for UI =====
+	private boolean isExpired;      // true if offer has expired (expiredAt set)
+	private boolean isSoldOut;      // true if offer has sold out (soldOutAt set)
+	private boolean isGreyedOut;    // true if isExpired || isSoldOut
     
     public OfferDto() {}   
     
 
-	public OfferDto(Long id, String vendorName, String name, String description, double price, double originalPrice, int quantityAvailable,
+	public OfferDto(Long id, String locationName, String chainName, String website, String vendorImageUrl,
+			String name, String description, double price, double originalPrice, int quantityAvailable,
 			String dietaryInfo, String allergenInfo, String imageUrl, double rating, int reviewsCount,
 			OffsetDateTime expirationDate, boolean active, OffsetDateTime createdAt, String address, String zipCode,
-			double latitude, double longitude, String businessType, OffsetDateTime pickupStartTime,
-			OffsetDateTime pickupEndTime) {
+			double latitude, double longitude, String currency, String businessType, OfferCategory category, LocalTime pickupStartTime,
+			LocalTime pickupEndTime) {
 		super();
 		this.id = id;
-		this.vendorName = vendorName;
+		this.locationName = locationName;
+		this.chainName = chainName;
+		this.website = website;
+		this.vendorImageUrl = vendorImageUrl;
 		this.name = name;
 		this.description = description;
 		this.price = price;
@@ -82,9 +119,25 @@ public class OfferDto implements Serializable{
 		this.zipCode = zipCode;
 		this.latitude = latitude;
 		this.longitude = longitude;
+		this.currency = currency;
 		this.businessType = businessType;
+		this.category = category;
+		this.pickupDate = null;
 		this.pickupStartTime = pickupStartTime;
 		this.pickupEndTime = pickupEndTime;
+	}
+	
+	public OfferDto(Long id, String locationName, String chainName, String website, String vendorImageUrl,
+			String name, String description, double price, double originalPrice, int quantityAvailable,
+			String dietaryInfo, String allergenInfo, String imageUrl, double rating, int reviewsCount,
+			OffsetDateTime expirationDate, boolean active, OffsetDateTime createdAt, String address, String zipCode,
+			double latitude, double longitude, String currency, String businessType, OfferCategory category, LocalDate pickupDate,
+			LocalTime pickupStartTime, LocalTime pickupEndTime) {
+		this(id, locationName, chainName, website, vendorImageUrl, name, description, price, originalPrice,
+				quantityAvailable, dietaryInfo, allergenInfo, imageUrl, rating, reviewsCount, expirationDate, active,
+				createdAt, address, zipCode, latitude, longitude, currency, businessType, category,
+				pickupStartTime, pickupEndTime);
+		this.pickupDate = pickupDate;
 	}
 
 	// Getters and setters
@@ -97,12 +150,44 @@ public class OfferDto implements Serializable{
         this.id = id;
     }
 
-    public String getVendorName() {
-        return vendorName;
+    public String getLocationName() {
+        return locationName;
     }
 
-    public void setVendorName(String vendorName) {
-        this.vendorName = vendorName;
+    public void setLocationName(String locationName) {
+        this.locationName = locationName;
+    }
+
+    public String getChainName() {
+        return chainName;
+    }
+
+    public void setChainName(String chainName) {
+        this.chainName = chainName;
+    }
+
+    public String getWebsite() {
+        return website;
+    }
+
+    public void setWebsite(String website) {
+        this.website = website;
+    }
+
+    public String getVendorImageUrl() {
+        return vendorImageUrl;
+    }
+
+    public void setVendorImageUrl(String vendorImageUrl) {
+        this.vendorImageUrl = vendorImageUrl;
+    }
+
+    public Long getVendorId() {
+        return vendorId;
+    }
+
+    public void setVendorId(Long vendorId) {
+        this.vendorId = vendorId;
     }
     
     public String getName() {
@@ -143,6 +228,14 @@ public class OfferDto implements Serializable{
 
     public void setQuantityAvailable(int quantityAvailable) {
         this.quantityAvailable = quantityAvailable;
+    }
+
+    public int getOriginalQuantity() {
+        return originalQuantity;
+    }
+
+    public void setOriginalQuantity(int originalQuantity) {
+        this.originalQuantity = originalQuantity;
     }
 
     public String getDietaryInfo() {
@@ -241,6 +334,14 @@ public class OfferDto implements Serializable{
 		this.longitude = longitude;
 	}
 
+	public String getCurrency() {
+		return currency;
+	}
+
+	public void setCurrency(String currency) {
+		this.currency = currency;
+	}
+
 	public String getBusinessType() {
 		return businessType;
 	}
@@ -249,20 +350,84 @@ public class OfferDto implements Serializable{
 		this.businessType = businessType;
 	}
 
-	public OffsetDateTime getPickupStartTime() {
+	public OfferCategory getCategory() {
+		return category;
+	}
+
+	public void setCategory(OfferCategory category) {
+		this.category = category;
+	}
+	
+	public LocalDate getPickupDate() {
+		return pickupDate;
+	}
+	
+	public void setPickupDate(LocalDate pickupDate) {
+		this.pickupDate = pickupDate;
+	}
+
+	public LocalTime getPickupStartTime() {
 		return pickupStartTime;
 	}
 
-	public void setPickupStartTime(OffsetDateTime pickupStartTime) {
+	public void setPickupStartTime(LocalTime pickupStartTime) {
 		this.pickupStartTime = pickupStartTime;
 	}
 
-	public OffsetDateTime getPickupEndTime() {
+	public LocalTime getPickupEndTime() {
 		return pickupEndTime;
 	}
 
-	public void setPickupEndTime(OffsetDateTime pickupEndTime) {
+	public void setPickupEndTime(LocalTime pickupEndTime) {
 		this.pickupEndTime = pickupEndTime;
+	}
+	
+	public PickupDaySlot getPickupDaySlot() {
+		return pickupDaySlot;
+	}
+	
+	public void setPickupDaySlot(PickupDaySlot pickupDaySlot) {
+		this.pickupDaySlot = pickupDaySlot;
+	}
+	
+	public PickupMealSlot getPickupMealSlot() {
+		return pickupMealSlot;
+	}
+	
+	public void setPickupMealSlot(PickupMealSlot pickupMealSlot) {
+		this.pickupMealSlot = pickupMealSlot;
+	}
+	
+	public boolean isCollectNow() {
+		return collectNow;
+	}
+	
+	public void setCollectNow(boolean collectNow) {
+		this.collectNow = collectNow;
+	}
+
+	public boolean isExpired() {
+		return isExpired;
+	}
+
+	public void setExpired(boolean isExpired) {
+		this.isExpired = isExpired;
+	}
+
+	public boolean isSoldOut() {
+		return isSoldOut;
+	}
+
+	public void setSoldOut(boolean isSoldOut) {
+		this.isSoldOut = isSoldOut;
+	}
+
+	public boolean isGreyedOut() {
+		return isGreyedOut;
+	}
+
+	public void setGreyedOut(boolean isGreyedOut) {
+		this.isGreyedOut = isGreyedOut;
 	}
 
 	public static long getSerialversionuid() {

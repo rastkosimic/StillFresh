@@ -92,14 +92,15 @@
 			<optional>true</optional>
 		</dependency>
 		<dependency>
-		    <groupId>com.sendgrid</groupId>
-		    <artifactId>sendgrid-java</artifactId>
-		</dependency>
-		<dependency>
 	    <groupId>org.springdoc</groupId>
 		    <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
 		    <version>2.0.2</version>
 		</dependency>
+	<!-- Spring Boot Actuator for metrics (timing around DB and in-memory processing) -->
+	<dependency>
+	    <groupId>org.springframework.boot</groupId>
+	    <artifactId>spring-boot-starter-actuator</artifactId>
+	</dependency>
 	<!-- Spring Boot Starter Cache -->
 	<dependency>
 	    <groupId>org.springframework.boot</groupId>
@@ -128,6 +129,18 @@
         <artifactId>shared-entities</artifactId>
         <version>0.0.1-SNAPSHOT</version>
     </dependency>
+    
+    <dependency>
+        <groupId>com.fasterxml.jackson.datatype</groupId>
+        <artifactId>jackson-datatype-jsr310</artifactId>
+    </dependency>
+
+		<!-- Offline lat/lon -> IANA time zone mapping -->
+		<dependency>
+			<groupId>net.iakovlev</groupId>
+			<artifactId>timeshape</artifactId>
+			<version>2025b.26</version>
+		</dependency>
 
 	</dependencies>
 
