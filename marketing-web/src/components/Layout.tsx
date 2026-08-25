@@ -1,31 +1,45 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Link, Outlet } from 'react-router-dom'
 
-const nav = [
+const sectionNav = [
+  { id: 'kako-radi', label: 'Kako radi' },
+  { id: 'za-prodavce', label: 'Za prodavce' },
+  { id: 'preuzmi', label: 'Preuzmi' },
+]
+
+const legalNav = [
   { to: '/privatnost', label: 'Privatnost' },
   { to: '/uslovi', label: 'Uslovi (kupci)' },
   { to: '/uslovi-prodavci', label: 'Uslovi (prodavci)' },
 ]
+
+function handleSectionClick(
+  e: React.MouseEvent<HTMLAnchorElement>,
+  id: string,
+) {
+  if (window.location.pathname === '/') {
+    e.preventDefault()
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+  }
+}
 
 export function Layout() {
   return (
     <div className="site-shell">
       <header className="site-header">
         <div className="site-header__inner">
-          <NavLink to="/" className="brand" end>
+          <Link to="/" className="brand">
             <img src="/logo.png" alt="" />
-            StillFresh
-          </NavLink>
+            Još Sveže
+          </Link>
           <nav className="nav" aria-label="Glavna navigacija">
-            {nav.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                style={({ isActive }) => ({
-                  color: isActive ? 'var(--green)' : undefined,
-                })}
+            {sectionNav.map((item) => (
+              <a
+                key={item.id}
+                href={`/#${item.id}`}
+                onClick={(e) => handleSectionClick(e, item.id)}
               >
                 {item.label}
-              </NavLink>
+              </a>
             ))}
           </nav>
         </div>
@@ -39,7 +53,7 @@ export function Layout() {
         <div className="site-footer__inner">
           <p>© {new Date().getFullYear()} StillFresh d.o.o. Beograd</p>
           <nav aria-label="Pravni dokumenti">
-            {nav.map((item) => (
+            {legalNav.map((item) => (
               <NavLink key={item.to} to={item.to}>
                 {item.label}
               </NavLink>
