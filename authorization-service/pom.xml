@@ -104,11 +104,11 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Spring Boot DevTools (Optional for development) -->
+        <!-- Development only — excluded from the production image by optional flag -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-devtools</artifactId>
-            <scope>runtime</scope>
+            <optional>true</optional>
         </dependency>
         
        	<dependency>

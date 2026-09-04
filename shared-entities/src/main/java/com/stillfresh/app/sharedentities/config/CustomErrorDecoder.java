@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 
 import com.stillfresh.app.sharedentities.exceptions.ConflictException;
@@ -14,6 +16,8 @@ import feign.codec.ErrorDecoder;
 
 
 public class CustomErrorDecoder implements ErrorDecoder {
+
+    private static final Logger logger = LoggerFactory.getLogger(CustomErrorDecoder.class);
 
     private final ErrorDecoder defaultDecoder = new Default();
     private final ObjectMapper objectMapper;
@@ -31,7 +35,7 @@ public class CustomErrorDecoder implements ErrorDecoder {
                 // Create a ConflictException with the error message
                 return new ConflictException(errorResponse.getMessage());
             } catch (IOException e) {
-                e.printStackTrace();
+                logger.warn("Failed to decode conflict response for {}: {}", methodKey, e.getMessage());
             }
         }
         return defaultDecoder.decode(methodKey, response);

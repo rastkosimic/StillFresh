@@ -10,6 +10,8 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.stillfresh.app.sharedentities.security.SharedSecret;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -49,7 +51,7 @@ public class GatewayTrustFilter extends OncePerRequestFilter {
         if ("true".equals(authenticated)) {
             // Verify the request actually came from the gateway by checking the shared secret
             String secret = request.getHeader(X_GATEWAY_SECRET);
-            if (!gatewaySecret.equals(secret)) {
+            if (!SharedSecret.matches(gatewaySecret, secret)) {
                 logger.warn("Invalid or missing X-Gateway-Secret - rejecting request from {}", request.getRemoteAddr());
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.getWriter().write("Unauthorized");
@@ -63,8 +65,7 @@ public class GatewayTrustFilter extends OncePerRequestFilter {
                 String email = request.getHeader(X_USER_EMAIL);
                 String rolesHeader = request.getHeader(X_USER_ROLE);
 
-                logger.debug("Gateway authenticated request - UserId: {}, Username: {}, Email: {}, Role: {}", 
-                           userId, username, email, rolesHeader);
+                logger.debug("Gateway authenticated request - userId: {}, role: {}", userId, rolesHeader);
 
                 // Validate required headers
                 if (username == null || username.isEmpty()) {

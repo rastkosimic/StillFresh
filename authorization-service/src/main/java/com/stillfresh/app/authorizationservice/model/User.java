@@ -1,5 +1,6 @@
 package com.stillfresh.app.authorizationservice.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.stillfresh.app.sharedentities.enums.Role;
 import com.stillfresh.app.sharedentities.enums.Status;
 import com.stillfresh.app.sharedentities.interfaces.Account;
@@ -35,6 +36,9 @@ public class User implements Account{
     private String username;
 
     // Password is optional for OAuth2 users (e.g., Google sign-in)
+    // WRITE_ONLY: accepted on registration, never serialized back out. Without this the
+    // BCrypt hash was returned in API responses wherever a controller returned the entity.
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
     
     // OAuth2 provider information

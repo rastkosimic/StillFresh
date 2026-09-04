@@ -1,0 +1,73 @@
+# Production profile.
+# Secrets and provider endpoints are declared without defaults: an unset variable fails
+# placeholder resolution at startup rather than silently falling back to a sandbox value.
+spring:
+  jpa:
+    hibernate:
+      # Schema changes go through migrations, not Hibernate. `validate` fails fast on drift.
+      ddl-auto: validate
+    # show-sql must stay false: Hibernate SQL logging exposes payout amounts and bank fields.
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+jwt:
+  secret: ${JWT_SECRET}
+
+gateway:
+  internal:
+    secret: ${GATEWAY_INTERNAL_SECRET}
+
+stripe:
+  connect:
+    returnUrl: ${APP_PUBLIC_BASE_URL}/vendors/stripe/return
+    refreshUrl: ${APP_PUBLIC_BASE_URL}/vendors/stripe/refresh
+
+allsecure:
+  # No sandbox fallbacks. Production host is asxgw.com, not asxgw.paymentsandbox.cloud.
+  base-url: ${ALLSECURE_BASE_URL}
+  api-key: ${ALLSECURE_API_KEY}
+  shared-secret: ${ALLSECURE_SHARED_SECRET}
+  username: ${ALLSECURE_USERNAME}
+  password: ${ALLSECURE_PASSWORD}
+  integration-key: ${ALLSECURE_INTEGRATION_KEY}
+  public-base-url: ${APP_PUBLIC_BASE_URL}
+
+payout:
+  # Must be chosen explicitly: sepa-xml or cmiplus. ProdConfigGuard rejects `stub` when
+  # auto-execute is on, because the stub rail marks transfers complete without sending them.
+  rail: ${PAYOUT_RAIL}
+  auto:
+    enabled: ${PAYOUT_AUTO_ENABLED:true}
+    approve: ${PAYOUT_AUTO_APPROVE:true}
+    # Defaults to off: batches are built and approved, but nothing leaves the platform
+    # until the bank rail has been verified end to end.
+    execute: ${PAYOUT_AUTO_EXECUTE:false}
+  executor:
+    # Must not be world-readable: generated pain.001 files contain vendor IBANs.
+    sepa-xml:
+      output-dir: ${PAYOUT_SEPA_XML_OUTPUT_DIR:/var/lib/stillfresh/payouts}
+  cmiplus:
+    environment: ${CMIPLUS_ENVIRONMENT:production}
+    stub-mode: ${CMIPLUS_STUB_MODE:false}
+
+logging:
+  level:
+    root: INFO
+    '[com.stillfresh.app]': INFO
+    '[org.hibernate.SQL]': WARN
+    # Never DEBUG: these clients carry card references, IBANs and provider credentials.
+    '[com.stillfresh.app.paymentservice.allsecure]': INFO
+    '[com.stillfresh.app.paymentservice.cmiplus]': INFO
+    feign: WARN
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+internal:
+  service:
+    secret: ${INTERNAL_SERVICE_SECRET}

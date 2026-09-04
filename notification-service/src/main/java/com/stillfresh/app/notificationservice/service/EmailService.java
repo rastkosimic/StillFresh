@@ -1,5 +1,7 @@
 package com.stillfresh.app.notificationservice.service;
 
+import com.stillfresh.app.sharedentities.logging.LogSanitizer;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,7 +51,7 @@ public class EmailService {
      */
     public void sendEmail(String to, String subject, String body) {
         if (!emailEnabled) {
-            logger.debug("Email disabled; skipping send to {}", to);
+            logger.debug("Email disabled; skipping send");
             return;
         }
         if (to == null || to.isBlank()) {
@@ -57,7 +59,7 @@ public class EmailService {
             return;
         }
         if (apiKey.isBlank() || domain.isBlank() || fromEmail.isBlank()) {
-            logger.warn("Email enabled but Mailgun config incomplete (api-key/domain/from-email); skipping send to {}", to);
+            logger.warn("Email enabled but Mailgun config incomplete (api-key/domain/from-email); skipping send");
             return;
         }
         try {
@@ -73,9 +75,9 @@ public class EmailService {
             form.add("text", body);
 
             restTemplate.postForEntity(url, new HttpEntity<>(form, headers), String.class);
-            logger.info("Sent email to {} (subject='{}')", to, subject);
+            logger.info("Sent email to {} (subject='{}')", LogSanitizer.maskEmail(to), subject);
         } catch (Exception e) {
-            logger.error("Failed to send email to {} (subject='{}')", to, subject, e);
+            logger.error("Failed to send email to {} (subject='{}')", LogSanitizer.maskEmail(to), subject, e);
         }
     }
 }

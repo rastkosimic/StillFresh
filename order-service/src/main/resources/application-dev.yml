@@ -1,0 +1,19 @@
+# Local development profile (docker-compose on a workstation).
+# Reproduces the behaviour the stack had before profiles were introduced.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+gateway:
+  internal:
+    secret: ${GATEWAY_INTERNAL_SECRET:stillfresh-gw-dev-secret-change-in-prod}
+
+logging:
+  level:
+    root: INFO
+
+internal:
+  service:
+    secret: ${INTERNAL_SERVICE_SECRET:stillfresh-internal-dev-secret-change-in-prod}

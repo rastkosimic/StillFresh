@@ -1,22 +1,37 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Generate root init-*.sql files from db-init/templates using values from .env.
+  Generate root init-*.sql files from db-init/templates using values from an env file.
 
 .DESCRIPTION
   Postgres init scripts cannot read environment variables. This script substitutes
   __POSTGRES_PASSWORD_*__ placeholders before docker-compose mounts the SQL files.
 
   Existing Postgres volumes keep their original passwords until recreated
-  (docker-compose down -v). Re-run this script whenever you change DB passwords in .env.
+  (docker-compose down -v). Re-run this script whenever you change DB passwords.
+
+.PARAMETER EnvFileName
+  Env file to read, relative to the repo root or absolute. Defaults to .env.
+  Pass .env.prod when generating for production.
+
+.EXAMPLE
+  powershell -File ./scripts/generate-init-sql.ps1
+  powershell -File ./scripts/generate-init-sql.ps1 -EnvFileName .env.prod
 #>
+param(
+    [string]$EnvFileName = ".env"
+)
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-$EnvFile = Join-Path $Root ".env"
+if ([System.IO.Path]::IsPathRooted($EnvFileName)) {
+    $EnvFile = $EnvFileName
+} else {
+    $EnvFile = Join-Path $Root $EnvFileName
+}
 $TemplateDir = Join-Path $Root "db-init\templates"
 
 if (-not (Test-Path $EnvFile)) {
-    Write-Error "Missing .env at $EnvFile. Copy .env.example to .env and fill in values first."
+    Write-Error "Missing env file at $EnvFile. Copy .env.example (or .env.prod.example) and fill in values first."
 }
 
 # Parse KEY=VALUE from .env (skip comments / blank lines)
@@ -42,7 +57,7 @@ function Escape-SqlLiteral([string]$value) {
 
 function Require-Env([string]$name) {
     if (-not $envMap.ContainsKey($name) -or [string]::IsNullOrWhiteSpace($envMap[$name])) {
-        Write-Error "Required variable $name is missing or empty in .env"
+        Write-Error "Required variable $name is missing or empty in $EnvFile"
     }
     return (Escape-SqlLiteral $envMap[$name])
 }

@@ -1,5 +1,7 @@
 package com.stillfresh.app.paymentservice.cmiplus;
 
+import com.stillfresh.app.sharedentities.logging.LogSanitizer;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -25,7 +27,7 @@ public class CmiplusAccountStatementClient {
 
     public String fetchIntradayStatement(String accountIban) {
         if (properties.isStubMode()) {
-            logger.debug("[CMIplus-STUB] Skipping CAMT052 fetch for {}", accountIban);
+            logger.debug("[CMIplus-STUB] Skipping CAMT052 fetch for {}", LogSanitizer.maskIban(accountIban));
             return "";
         }
         String today = LocalDate.now().toString();

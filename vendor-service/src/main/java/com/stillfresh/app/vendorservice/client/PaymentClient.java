@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import java.util.List;
 import java.util.Map;
 
-@FeignClient(name = "payment-service")
+@FeignClient(name = "payment-service", configuration = com.stillfresh.app.vendorservice.config.PaymentServiceFeignConfig.class)
 public interface PaymentClient {
     
     /**

@@ -1,5 +1,7 @@
 package com.stillfresh.app.offerservice.service;
 
+import com.stillfresh.app.sharedentities.logging.LogSanitizer;
+
 import java.time.OffsetDateTime;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -16,10 +18,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.stillfresh.app.offerservice.config.OfferMetrics;
+import com.stillfresh.app.sharedentities.exceptions.ResourceNotFoundException;
 import com.stillfresh.app.offerservice.model.Offer;
 import com.stillfresh.app.offerservice.publisher.OfferEventPublisher;
 import com.stillfresh.app.offerservice.repository.OfferRepository;
@@ -304,8 +308,32 @@ public class OfferService {
                 .collect(Collectors.toList());
     }
 
-    public void deleteOffer(Long id) {
-        offerRepository.deleteById(id);
+    /**
+     * Deletes an offer on behalf of the authenticated caller.
+     *
+     * <p>The role check in {@code WebSecurityConfig} establishes that the caller is a vendor or
+     * an admin; this check establishes that a vendor is deleting its own offer. Without it any
+     * vendor could delete the entire marketplace one ID at a time.
+     *
+     * @param id             the offer to delete
+     * @param callerVendorId the caller's vendor ID, as stamped by the gateway; ignored for admins
+     * @param callerIsAdmin  whether the caller holds ADMIN or SUPER_ADMIN
+     */
+    @CacheEvict(value = "activeOffers", allEntries = true)
+    public void deleteOffer(Long id, Long callerVendorId, boolean callerIsAdmin) {
+        Offer offer = offerRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Offer not found with id: " + id));
+
+        if (!callerIsAdmin) {
+            if (callerVendorId == null || !callerVendorId.equals(offer.getVendorId())) {
+                logger.warn("Rejected delete of offer {} by vendorId {}: offer belongs to vendorId {}",
+                        id, callerVendorId, offer.getVendorId());
+                throw new AccessDeniedException("You can only delete your own offers");
+            }
+        }
+
+        offerRepository.delete(offer);
+        logger.info("Deleted offer {} (vendorId {})", id, offer.getVendorId());
     }
     
     
@@ -468,8 +496,9 @@ public class OfferService {
 
         long dbMs = endDb - startDb;
         long inMemoryMs = endTotal - endDb;
-        logger.info("getNearbyOffers - dbMs={}, inMemoryMs={}, totalMs={}, rangeKm={}, userLat={}, userLon={}, count={}",
-                dbMs, inMemoryMs, (endTotal - startTotal), range, userLat, userLon, result.size());
+        logger.info("getNearbyOffers - dbMs={}, inMemoryMs={}, totalMs={}, rangeKm={}, lat={}, lon={}, count={}",
+                dbMs, inMemoryMs, (endTotal - startTotal), range,
+                LogSanitizer.roundCoordinate(userLat), LogSanitizer.roundCoordinate(userLon), result.size());
         offerMetrics.recordOfferListDb(OfferMetrics.ENDPOINT_NEARBY, dbMs);
         offerMetrics.recordOfferListInMemory(OfferMetrics.ENDPOINT_NEARBY, inMemoryMs);
 

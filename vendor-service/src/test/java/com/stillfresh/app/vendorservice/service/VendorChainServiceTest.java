@@ -5,8 +5,11 @@ import com.stillfresh.app.sharedentities.enums.PayoutModel;
 import com.stillfresh.app.sharedentities.enums.Role;
 import com.stillfresh.app.sharedentities.enums.Status;
 import com.stillfresh.app.sharedentities.dto.OfferDto;
+import com.stillfresh.app.sharedentities.dto.VendorStatsResponse;
 import com.stillfresh.app.sharedentities.vendor.events.OfferRelatedVendorDetailsEvent;
 import com.stillfresh.app.vendorservice.client.AuthorizationServiceClient;
+import com.stillfresh.app.vendorservice.client.OrderClient;
+import com.stillfresh.app.vendorservice.dto.ChainLocationStatsResponse;
 import com.stillfresh.app.vendorservice.model.Vendor;
 import com.stillfresh.app.vendorservice.publisher.VendorEventPublisher;
 import com.stillfresh.app.vendorservice.repository.VendorRepository;
@@ -23,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.cache.CacheManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -60,6 +64,9 @@ class VendorChainServiceTest {
 
     @Mock
     private AuthorizationServiceClient authorizationServiceClient;
+
+    @Mock
+    private OrderClient orderClient;
 
     @Mock
     private CacheManager cacheManager;
@@ -129,6 +136,18 @@ class VendorChainServiceTest {
         CustomVendorDetails details = new CustomVendorDetails(vendor);
         SecurityContextHolder.getContext().setAuthentication(
             new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities()));
+    }
+
+    private void authenticateAsSuperAdmin() {
+        SecurityContextHolder.getContext().setAuthentication(
+            new UsernamePasswordAuthenticationToken(
+                "super-admin",
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"))));
+    }
+
+    private VendorStatsResponse vendorStats(long units, long earningsCents, long feeCents, long grossCents) {
+        return new VendorStatsResponse(units, earningsCents, feeCents, grossCents, List.of(), null, null);
     }
 
     private void stubVendors(Vendor... vendors) {
@@ -580,5 +599,102 @@ class VendorChainServiceTest {
 
         RuntimeException ex = assertThrows(RuntimeException.class, () -> vendorService.submitBankDetails(details));
         assertTrue(ex.getMessage().contains("not using MoR"));
+    }
+
+    // ---------- chain stats ----------
+
+    @Test
+    void hqAdminGetsAllLocationStatsWithCorrectTotals() {
+        Vendor branch = location(2L, "branch@chain.test", "Branch");
+        stubVendors(headquarters, branch);
+        authenticateAs(headquarters);
+
+        when(orderClient.getVendorStats(1L, null, null, null))
+            .thenReturn(vendorStats(10, 1000, 200, 1200));
+        when(orderClient.getVendorStats(2L, null, null, null))
+            .thenReturn(vendorStats(5, 500, 100, 600));
+
+        ChainLocationStatsResponse response = vendorService.getChainLocationStats(null, null, null);
+
+        assertEquals(CHAIN_ID, response.getChainId());
+        assertEquals("Test Chain", response.getChainName());
+        assertEquals(2, response.getLocations().size());
+        assertEquals(15, response.getChainTotals().getTotalUnitsSold());
+        assertEquals(1500, response.getChainTotals().getTotalVendorEarningsCents());
+        assertEquals(300, response.getChainTotals().getTotalPlatformFeeCents());
+        assertEquals(1800, response.getChainTotals().getTotalGrossRevenueCents());
+        assertTrue(response.getLocations().stream().allMatch(e -> e.getError() == null));
+    }
+
+    @Test
+    void branchAdminCannotViewChainStats() {
+        Vendor branch = location(2L, "branch@chain.test", "Branch");
+        stubVendors(headquarters, branch);
+        authenticateAs(branch);
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+            () -> vendorService.getChainLocationStats(null, null, null));
+        assertTrue(ex.getMessage().contains("Only headquarters"));
+        verify(orderClient, never()).getVendorStats(anyLong(), any(), any(), any());
+    }
+
+    @Test
+    void nonChainVendorAdminCannotViewChainStats() {
+        Vendor standalone = location(9L, "solo@test.test", "Solo");
+        standalone.setIsChainLocation(false);
+        standalone.setChainId(null);
+        authenticateAs(standalone);
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+            () -> vendorService.getChainLocationStats(null, null, null));
+        assertTrue(ex.getMessage().contains("not part of a chain"));
+    }
+
+    @Test
+    void superAdminRequiresChainId() {
+        authenticateAsSuperAdmin();
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+            () -> vendorService.getChainLocationStats(null, null, null));
+        assertTrue(ex.getMessage().contains("chainId is required"));
+    }
+
+    @Test
+    void superAdminWithChainIdGetsAllLocations() {
+        Vendor branch = location(2L, "branch@chain.test", "Branch");
+        stubVendors(headquarters, branch);
+        authenticateAsSuperAdmin();
+
+        when(orderClient.getVendorStats(anyLong(), any(), any(), any()))
+            .thenReturn(vendorStats(1, 100, 10, 110));
+
+        ChainLocationStatsResponse response = vendorService.getChainLocationStats(null, null, CHAIN_ID);
+
+        assertEquals(CHAIN_ID, response.getChainId());
+        assertEquals(2, response.getLocations().size());
+        verify(orderClient).getVendorStats(1L, null, null, null);
+        verify(orderClient).getVendorStats(2L, null, null, null);
+    }
+
+    @Test
+    void partialFeignFailureReturnsErrorOnLocation() {
+        Vendor branch = location(2L, "branch@chain.test", "Branch");
+        stubVendors(headquarters, branch);
+        authenticateAs(headquarters);
+
+        when(orderClient.getVendorStats(1L, null, null, null))
+            .thenReturn(vendorStats(10, 1000, 200, 1200));
+        when(orderClient.getVendorStats(2L, null, null, null))
+            .thenThrow(new RuntimeException("order-service unavailable"));
+
+        ChainLocationStatsResponse response = vendorService.getChainLocationStats(null, null, null);
+
+        assertEquals(2, response.getLocations().size());
+        assertNull(response.getLocations().stream()
+            .filter(e -> e.getVendorId().equals(1L)).findFirst().orElseThrow().getError());
+        assertEquals("order-service unavailable", response.getLocations().stream()
+            .filter(e -> e.getVendorId().equals(2L)).findFirst().orElseThrow().getError());
+        assertEquals(10, response.getChainTotals().getTotalUnitsSold());
+        assertEquals(1200, response.getChainTotals().getTotalGrossRevenueCents());
     }
 }

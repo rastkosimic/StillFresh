@@ -1,0 +1,14 @@
+# Production profile.
+# The registry has no authentication, so it must never be published to the host.
+# See docker-compose.prod.yml, where it is reachable only on the internal network.
+logging:
+  level:
+    root: INFO
+    '[com.netflix.eureka]': WARN
+    '[com.netflix.discovery]': WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

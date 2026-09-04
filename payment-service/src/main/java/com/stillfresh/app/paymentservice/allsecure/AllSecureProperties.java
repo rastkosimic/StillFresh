@@ -44,6 +44,25 @@ public class AllSecureProperties {
     /** Publicly reachable base URL used to build callbackUrl/successUrl/errorUrl. */
     private String publicBaseUrl = "http://localhost:8086";
 
+    /**
+     * Maximum number of attempts for a rate-limited request (HTTP 429 / gateway code 1009) before
+     * giving up. A value of 1 disables retrying. A rate-limited request is rejected before processing,
+     * so retrying the same transactionId cannot double-charge.
+     */
+    private int maxRetries = 4;
+
+    /** Base backoff in milliseconds for the exponential backoff between rate-limit retries. */
+    private long retryBackoffMs = 500;
+
+    /** Upper bound (cap) in milliseconds for the backoff between rate-limit retries. */
+    private long retryMaxBackoffMs = 4000;
+
+    /** Connect timeout for outbound gateway calls, in milliseconds. */
+    private int connectTimeoutMs = 5000;
+
+    /** Read timeout for outbound gateway calls, in milliseconds. */
+    private int readTimeoutMs = 20000;
+
     public String getBaseUrl() { return baseUrl; }
     public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
 
@@ -73,6 +92,21 @@ public class AllSecureProperties {
 
     public String getPublicBaseUrl() { return publicBaseUrl; }
     public void setPublicBaseUrl(String publicBaseUrl) { this.publicBaseUrl = publicBaseUrl; }
+
+    public int getMaxRetries() { return maxRetries; }
+    public void setMaxRetries(int maxRetries) { this.maxRetries = maxRetries; }
+
+    public long getRetryBackoffMs() { return retryBackoffMs; }
+    public void setRetryBackoffMs(long retryBackoffMs) { this.retryBackoffMs = retryBackoffMs; }
+
+    public long getRetryMaxBackoffMs() { return retryMaxBackoffMs; }
+    public void setRetryMaxBackoffMs(long retryMaxBackoffMs) { this.retryMaxBackoffMs = retryMaxBackoffMs; }
+
+    public int getConnectTimeoutMs() { return connectTimeoutMs; }
+    public void setConnectTimeoutMs(int connectTimeoutMs) { this.connectTimeoutMs = connectTimeoutMs; }
+
+    public int getReadTimeoutMs() { return readTimeoutMs; }
+    public void setReadTimeoutMs(int readTimeoutMs) { this.readTimeoutMs = readTimeoutMs; }
 
     /** Full URL of the transaction endpoint. */
     public String transactionUrl() {

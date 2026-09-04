@@ -1,0 +1,4 @@
+# Local development profile (docker-compose on a workstation).
+logging:
+  level:
+    root: INFO

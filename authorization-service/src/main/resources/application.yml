@@ -2,6 +2,8 @@ server:
   port: 8082
 
 spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   main:
     allow-bean-definition-overriding: true
   application:
@@ -12,9 +14,7 @@ spring:
     username: stillfreshauth
     password: ${POSTGRES_PASSWORD_AUTH:}
   jpa:
-    hibernate:
-      ddl-auto: update #update
-    show-sql: true
+    # ddl-auto and show-sql are profile-specific (see application-dev.yml / application-prod.yml)
     database-platform: org.hibernate.dialect.PostgreSQLDialect
   kafka:
     bootstrap-servers: ${KAFKA_BROKER:kafka:9092}
@@ -54,7 +54,7 @@ spring:
             scope:
               - email
               - profile
-            redirect-uri: http://localhost:8080/auth/oauth2/callback/google
+            # redirect-uri is profile-specific (public gateway URL differs per environment)
         provider:
           google:
             authorization-uri: https://accounts.google.com/o/oauth2/auth
@@ -73,7 +73,7 @@ mailgun:
   base-url: ${MAILGUN_BASE_URL:https://api.mailgun.net/v3}
 
 jwt:
-  secret: ${JWT_SECRET:}
+  # jwt.secret is profile-specific: prod requires it from the environment with no fallback.
   # Legacy (older clients used a single token). New clients should use accessJwt/refreshToken.
   expiration: 3600000
   access-expiration-ms: 900000        # 15 minutes
@@ -94,6 +94,18 @@ feign:
         connectTimeout: 2000
         readTimeout: 3000
 
-gateway:
-  internal:
-    secret: ${GATEWAY_INTERNAL_SECRET:stillfresh-gw-dev-secret-change-in-prod}
+# gateway.internal.secret is profile-specific: prod requires it from the environment
+# with no fallback so a missing value fails startup.
+
+# Public base URL used to build password-reset and verification links in outbound email.
+app:
+  public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
+
+admin:
+  # One-time token for POST /admin/create-initial-admin. Empty disables the endpoint.
+  # No SUPER_ADMIN is seeded into the database, so this is how the first one is created.
+  bootstrap:
+    token: ${ADMIN_BOOTSTRAP_TOKEN:}
+
+# internal.service.secret authenticates service-to-service calls that carry no end-user JWT.
+# Profile-specific: prod requires it from the environment with no fallback.

@@ -371,8 +371,10 @@ public class AllSecurePaymentProvider implements PaymentProvider {
             logger.debug("PaymentSuccessEvent already published for referenceId={}; skipping.", tx.getPaymentIntentId());
             return;
         }
-        eventPublisher.publishPaymentSuccessEvent(new PaymentSuccessEvent(
-                tx.getRequestId(), tx.getUserId(), tx.getOfferId(), tx.getPaymentIntentId()));
+        PaymentSuccessEvent successEvent = new PaymentSuccessEvent(
+                tx.getRequestId(), tx.getUserId(), tx.getOfferId(), tx.getPaymentIntentId());
+        successEvent.setPaymentProvider(NAME);
+        eventPublisher.publishPaymentSuccessEvent(successEvent);
         tx.setSuccessNotified(true);
         tx.setAuthorizationStatus(AuthorizationStatus.AUTHORIZED);
         tx.setRedirectUrl(null);

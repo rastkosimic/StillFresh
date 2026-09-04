@@ -9,7 +9,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
-@FeignClient(name = "offer-service")
+@FeignClient(name = "offer-service",
+        configuration = com.stillfresh.app.vendorservice.config.OfferServiceFeignConfig.class)
 public interface OfferServiceClient {
 
     @GetMapping("/offers/{vendorId}/all-offers")

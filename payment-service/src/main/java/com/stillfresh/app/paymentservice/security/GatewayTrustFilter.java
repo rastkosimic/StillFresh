@@ -11,6 +11,9 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.stillfresh.app.sharedentities.security.InternalServiceHeaders;
+import com.stillfresh.app.sharedentities.security.SharedSecret;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -57,7 +60,7 @@ public class GatewayTrustFilter extends OncePerRequestFilter {
 
         // AllSecure routes must transit the API gateway (X-Gateway-Secret). Direct hits to payment-service are rejected.
         if (path.startsWith(ALLSECURE_PREFIX)) {
-            if (!gatewaySecret.equals(request.getHeader(X_GATEWAY_SECRET))) {
+            if (!SharedSecret.matches(gatewaySecret, request.getHeader(X_GATEWAY_SECRET))) {
                 logger.warn("Rejected direct AllSecure request without gateway secret: {} from {}",
                         path, request.getRemoteAddr());
                 response.setStatus(HttpServletResponse.SC_FORBIDDEN);
@@ -82,7 +85,7 @@ public class GatewayTrustFilter extends OncePerRequestFilter {
         if ("true".equals(authenticated)) {
             // Verify the request actually came from the gateway by checking the shared secret
             String secret = request.getHeader(X_GATEWAY_SECRET);
-            if (!gatewaySecret.equals(secret)) {
+            if (!SharedSecret.matches(gatewaySecret, secret)) {
                 logger.warn("Invalid or missing X-Gateway-Secret - rejecting request from {}", request.getRemoteAddr());
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.getWriter().write("Unauthorized");
@@ -96,8 +99,7 @@ public class GatewayTrustFilter extends OncePerRequestFilter {
                 String email = request.getHeader(X_USER_EMAIL);
                 String rolesHeader = request.getHeader(X_USER_ROLE);
 
-                logger.debug("Gateway authenticated request - UserId: {}, Username: {}, Email: {}, Role: {}", 
-                           userId, username, email, rolesHeader);
+                logger.debug("Gateway authenticated request - userId: {}, role: {}", userId, rolesHeader);
 
                 // Validate required headers
                 if (username == null || username.isEmpty()) {
@@ -158,69 +160,74 @@ public class GatewayTrustFilter extends OncePerRequestFilter {
                 return;
             }
 
-            // Fallback: Check for Authorization header (service-to-service calls)
-            // This allows services to call each other directly without going through the gateway
-            String authHeader = request.getHeader(AUTHORIZATION);
-            if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
-                String jwt = authHeader.substring(BEARER_PREFIX.length());
-                
-                if (jwtUtil != null) {
-                    try {
-                        // Validate JWT token directly (for service-to-service calls)
-                        if (jwtUtil.isTokenExpired(jwt)) {
-                            logger.warn("JWT token is expired");
-                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.getWriter().write("Token expired");
-                            return;
-                        }
-
-                        // Extract user info from JWT
-                        String username = jwtUtil.extractUsername(jwt);
-                        Long userId = jwtUtil.extractUserId(jwt);
-                        String email = jwtUtil.extractEmail(jwt);
-                        List<SimpleGrantedAuthority> authorities = jwtUtil.extractRoles(jwt);
-
-                        logger.debug("Authenticated service-to-service request - UserId: {}, Username: {}, Email: {}", 
-                                   userId, username, email);
-
-                        // Set authentication in SecurityContext
-                        UsernamePasswordAuthenticationToken authentication = 
-                            new UsernamePasswordAuthenticationToken(username, jwt, authorities);
-                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                        
-                        SecurityContextHolder.getContext().setAuthentication(authentication);
-                        
-                        // Store userId in request attribute for easy access
-                        if (userId != null) {
-                            request.setAttribute("userId", userId);
-                        }
-                        request.setAttribute("username", username);
-                        if (email != null) {
-                            request.setAttribute("email", email);
-                        }
-
-                        logger.debug("Successfully authenticated service-to-service request: {}", username);
-
-                    } catch (Exception e) {
-                        logger.error("Error validating JWT token for service-to-service call", e);
-                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                        response.getWriter().write("Invalid token");
-                        return;
-                    }
-                } else {
-                    logger.warn("JwtUtil not available, cannot validate JWT for service-to-service call");
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    response.getWriter().write("JWT validation not available");
+            // Vendor-service Feign calls present both a forwarded end-user JWT and the
+            // internal secret. A JWT with a mismatched roles claim would 401 here and
+            // never reach InternalServiceFilter, so skip JWT fallback when the secret is present.
+            String internalSecretHeader = request.getHeader(InternalServiceHeaders.INTERNAL_SECRET);
+            if (internalSecretHeader == null || internalSecretHeader.isBlank()) {
+                if (!authenticateFromJwt(request, response)) {
                     return;
                 }
-            } else {
-                // Not authenticated by gateway and no Authorization header - might be a public endpoint
-                // Let it pass through (public endpoints are handled by WebSecurityConfig)
-                logger.debug("Request not authenticated by gateway and no Authorization header - may be public endpoint");
             }
         }
 
         chain.doFilter(request, response);
+    }
+
+    /**
+     * @return {@code false} when the filter has already written an error response
+     */
+    private boolean authenticateFromJwt(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        String authHeader = request.getHeader(AUTHORIZATION);
+        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+            logger.debug("Request not authenticated by gateway and no Authorization header - may be public endpoint");
+            return true;
+        }
+
+        String jwt = authHeader.substring(BEARER_PREFIX.length());
+        if (jwtUtil == null) {
+            logger.warn("JwtUtil not available, cannot validate JWT for service-to-service call");
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("JWT validation not available");
+            return false;
+        }
+
+        try {
+            if (jwtUtil.isTokenExpired(jwt)) {
+                logger.warn("JWT token is expired");
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("Token expired");
+                return false;
+            }
+
+            String username = jwtUtil.extractUsername(jwt);
+            Long userId = jwtUtil.extractUserId(jwt);
+            String email = jwtUtil.extractEmail(jwt);
+            List<SimpleGrantedAuthority> authorities = jwtUtil.extractRoles(jwt);
+
+            logger.debug("Authenticated service-to-service request - userId: {}", userId);
+
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(username, jwt, authorities);
+            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+            if (userId != null) {
+                request.setAttribute("userId", userId);
+            }
+            request.setAttribute("username", username);
+            if (email != null) {
+                request.setAttribute("email", email);
+            }
+
+            logger.debug("Successfully authenticated service-to-service request: {}", username);
+            return true;
+        } catch (Exception e) {
+            logger.error("Error validating JWT token for service-to-service call", e);
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("Invalid token");
+            return false;
+        }
     }
 
     private static String requestPath(HttpServletRequest request) {
@@ -234,4 +241,3 @@ public class GatewayTrustFilter extends OncePerRequestFilter {
         return "/payment/allsecure/callback".equals(path) || "/payment/allsecure/return".equals(path);
     }
 }
-

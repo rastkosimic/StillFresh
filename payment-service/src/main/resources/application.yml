@@ -2,6 +2,8 @@ server:
   port: 8086
 
 spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   main:
     allow-bean-definition-overriding: true
   application:
@@ -12,9 +14,7 @@ spring:
     username: stillfreshpayments
     password: ${POSTGRES_PASSWORD_PAYMENTS:}
   jpa:
-    hibernate:
-      ddl-auto: update # update for production
-    show-sql: true
+    # ddl-auto and show-sql are profile-specific (see application-dev.yml / application-prod.yml)
     database-platform: org.hibernate.dialect.PostgreSQLDialect
   kafka:
     bootstrap-servers: ${KAFKA_BROKER:kafka:9092}
@@ -64,28 +64,28 @@ stripe:
     fee:
       percent: 5.0 # Legacy key retained for backward compatibility; superseded by platform.fee.percent
   connect:
-    returnUrl: http://localhost:8083/vendors/stripe/return
-    refreshUrl: http://localhost:8083/vendors/stripe/refresh
+    # returnUrl/refreshUrl are profile-specific (public gateway URL differs per environment)
     defaultCountry: DE # Default country for Stripe Connect accounts (ISO 2-letter code: US, GB, DE, etc.)
 
 # AllSecure Exchange Platform (XML Schema V2). Sandbox host differs from the production asxgw.com host.
-# Secrets (password, shared-secret) MUST be supplied via environment variables - no defaults are committed.
+# Credentials and endpoints are profile-specific: dev defaults to the public sandbox/simulator,
+# prod requires every value from the environment with no fallback.
 allsecure:
-  base-url: ${ALLSECURE_BASE_URL:https://asxgw.paymentsandbox.cloud}
   transaction-path: ${ALLSECURE_TRANSACTION_PATH:/transaction}
   status-path: ${ALLSECURE_STATUS_PATH:/status}
-  api-key: ${ALLSECURE_API_KEY:genericmerchant-simulator-1}
-  shared-secret: ${ALLSECURE_SHARED_SECRET:}
-  username: ${ALLSECURE_USERNAME:genericmerchant-api-1}
-  password: ${ALLSECURE_PASSWORD:}
-  integration-key: ${ALLSECURE_INTEGRATION_KEY:sJBHPYLTFPNXjDYrQocG-1}
   currency: ${ALLSECURE_CURRENCY:RSD}
-  # Publicly reachable base URL that AllSecure uses for callbackUrl/successUrl/errorUrl.
-  # Must be the API gateway (or ngrok tunnel to :8080), not payment-service directly.
-  public-base-url: ${ALLSECURE_PUBLIC_BASE_URL:http://localhost:8080}
+  # Resilience against gateway rate limiting (HTTP 429 / code 1009): rate-limited requests are rejected
+  # before processing, so retrying the same transactionId is safe. Backoff is exponential with jitter,
+  # capped at retry-max-backoff-ms, and honours a Retry-After header when present.
+  max-retries: ${ALLSECURE_MAX_RETRIES:4}
+  retry-backoff-ms: ${ALLSECURE_RETRY_BACKOFF_MS:500}
+  retry-max-backoff-ms: ${ALLSECURE_RETRY_MAX_BACKOFF_MS:4000}
+  # Outbound HTTP timeouts for gateway calls (milliseconds).
+  connect-timeout-ms: ${ALLSECURE_CONNECT_TIMEOUT_MS:5000}
+  read-timeout-ms: ${ALLSECURE_READ_TIMEOUT_MS:20000}
   
 jwt:
-  secret: ${JWT_SECRET:}
+  # jwt.secret is profile-specific: prod requires it from the environment with no fallback.
   expiration: 3600000
 
 payment:
@@ -123,12 +123,8 @@ payout:
   default-currency: ${PAYOUT_DEFAULT_CURRENCY:RSD}
   # Maximum total batch amount in minor currency units (0 = no limit).
   max-batch-amount-cents: ${PAYOUT_MAX_BATCH_AMOUNT_CENTS:0}
-  # Active payout rail: stub | sepa-xml | cmiplus
-  rail: ${PAYOUT_RAIL:stub}
-  auto:
-    enabled: ${PAYOUT_AUTO_ENABLED:true}
-    approve: ${PAYOUT_AUTO_APPROVE:true}
-    execute: ${PAYOUT_AUTO_EXECUTE:true}
+  # payout.rail and payout.auto.* are profile-specific. The `stub` rail only logs transfers
+  # while marking them complete, so it must never be the effective value in production.
   status-poll:
     cron: ${PAYOUT_STATUS_POLL_CRON:0 */15 * * * *}
   executor:
@@ -138,7 +134,7 @@ payout:
     stub:
       fail: ${PAYOUT_EXECUTOR_STUB_FAIL:false}
   cmiplus:
-    environment: ${CMIPLUS_ENVIRONMENT:sandbox}
+    # environment and stub-mode are profile-specific.
     base-url: ${CMIPLUS_BASE_URL:}
     client-id: ${CMIPLUS_CLIENT_ID:}
     client-secret: ${CMIPLUS_CLIENT_SECRET:}
@@ -150,9 +146,10 @@ payout:
     payment-initiation-path: ${CMIPLUS_PAYMENT_INITIATION_PATH:/payment-initiation}
     payment-status-path: ${CMIPLUS_PAYMENT_STATUS_PATH:/payment-status}
     account-statement-path: ${CMIPLUS_ACCOUNT_STATEMENT_PATH:/account-statement}
-    stub-mode: ${CMIPLUS_STUB_MODE:true}
     stub-complete-delay-seconds: ${CMIPLUS_STUB_COMPLETE_DELAY_SECONDS:30}
 
-gateway:
-  internal:
-    secret: ${GATEWAY_INTERNAL_SECRET:stillfresh-gw-dev-secret-change-in-prod}
+# gateway.internal.secret is profile-specific: prod requires it from the environment
+# with no fallback so a missing value fails startup.
+
+# internal.service.secret authenticates service-to-service calls that carry no end-user JWT.
+# Profile-specific: prod requires it from the environment with no fallback.

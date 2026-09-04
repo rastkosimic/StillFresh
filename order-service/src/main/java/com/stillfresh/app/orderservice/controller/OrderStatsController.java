@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -156,7 +157,7 @@ public class OrderStatsController {
                 p.getNetAmountCents() != null ? p.getNetAmountCents() : 0L,
                 p.getFeePercentApplied(),
                 p.getCurrency(),
-                p.getSettledAt()
+                p.getSettledAt() != null ? OffsetDateTime.ofInstant(p.getSettledAt(), ZoneOffset.UTC) : null
         );
     }
 }

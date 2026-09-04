@@ -1,15 +1,25 @@
 #!/usr/bin/env bash
-# Generate root init-*.sql files from db-init/templates using values from .env.
+# Generate root init-*.sql files from db-init/templates using values from an env file.
 # Existing Postgres volumes keep their original passwords until recreated
-# (docker-compose down -v). Re-run whenever you change DB passwords in .env.
+# (docker-compose down -v). Re-run whenever you change DB passwords.
+#
+# Usage:
+#   ./scripts/generate-init-sql.sh            # uses .env (local development)
+#   ./scripts/generate-init-sql.sh .env.prod  # uses .env.prod (production)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ENV_FILE="$ROOT/.env"
+ENV_ARG="${1:-.env}"
+# Accept either a bare filename relative to the repo root or an absolute path.
+if [[ "$ENV_ARG" == /* ]]; then
+  ENV_FILE="$ENV_ARG"
+else
+  ENV_FILE="$ROOT/$ENV_ARG"
+fi
 TEMPLATE_DIR="$ROOT/db-init/templates"
 
 if [[ ! -f "$ENV_FILE" ]]; then
-  echo "Missing .env at $ENV_FILE. Copy .env.example to .env and fill in values first." >&2
+  echo "Missing env file at $ENV_FILE. Copy .env.example (or .env.prod.example) and fill in values first." >&2
   exit 1
 fi
 
@@ -40,7 +50,7 @@ require_env() {
   local name="$1"
   local value="${!name-}"
   if [[ -z "${value}" ]]; then
-    echo "Required variable $name is missing or empty in .env" >&2
+    echo "Required variable $name is missing or empty in $ENV_FILE" >&2
     exit 1
   fi
   sql_escape "$value"
@@ -70,6 +80,8 @@ substitute() {
     echo "Unresolved password placeholder remaining in $out" >&2
     exit 1
   fi
+  # The generated file contains plaintext passwords: restrict it to the owner.
+  chmod 600 "$out"
   echo "Wrote $(basename "$out")"
 }
 

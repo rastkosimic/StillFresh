@@ -1,7 +1,9 @@
 package com.stillfresh.app.vendorservice.controller;
 
 import com.stillfresh.app.vendorservice.dto.VendorDashboardResponse;
+import com.stillfresh.app.vendorservice.model.Vendor;
 import com.stillfresh.app.vendorservice.service.VendorDashboardService;
+import com.stillfresh.app.vendorservice.service.VendorService;
 import com.stillfresh.app.vendorservice.security.CustomVendorDetails;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -27,6 +29,9 @@ public class VendorDashboardController {
 
     @Autowired
     private VendorDashboardService dashboardService;
+
+    @Autowired
+    private VendorService vendorService;
 
     /**
      * Returns the aggregated dashboard for a vendor.
@@ -67,14 +72,17 @@ public class VendorDashboardController {
     private boolean isAdminOrSelf(Long requestedVendorId, HttpServletRequest request) {
         if (isAdmin()) return true;
 
-        // Prefer the gateway-provided numeric user id (set by GatewayTrustFilter)
+        // Only short-circuit on a positive self-match; a mismatched gateway userId must
+        // still allow HQ chain admins to load a sibling location's dashboard.
         Object reqUserId = request != null ? request.getAttribute("userId") : null;
-        if (reqUserId instanceof Long l) {
-            return l.equals(requestedVendorId);
+        if (reqUserId instanceof Long l && l.equals(requestedVendorId)) {
+            return true;
         }
         if (reqUserId != null) {
             try {
-                return Long.parseLong(reqUserId.toString()) == requestedVendorId;
+                if (Long.parseLong(reqUserId.toString()) == requestedVendorId) {
+                    return true;
+                }
             } catch (Exception ignored) { }
         }
 
@@ -85,14 +93,9 @@ public class VendorDashboardController {
                 .anyMatch(r -> r.equals("ROLE_VENDOR") || r.equals("ROLE_VENDOR_ADMIN"));
         if (!isVendorRole) return false;
 
-        // If we have full vendor principal, compare by vendor id
-        try {
-            Object principal = auth.getPrincipal();
-            if (principal instanceof CustomVendorDetails cvd && cvd.getVendor() != null) {
-                Long principalVendorId = cvd.getVendor().getId();
-                return principalVendorId != null && principalVendorId.equals(requestedVendorId);
-            }
-        } catch (Exception ignored) { }
+        if (canHeadquartersAccessChainLocation(requestedVendorId, request, auth)) {
+            return true;
+        }
 
         // Last-resort fallback: if name happens to be the numeric id
         try {
@@ -101,5 +104,58 @@ public class VendorDashboardController {
         } catch (Exception ignored) { }
 
         return false;
+    }
+
+    /** HQ VENDOR_ADMIN may view dashboards for any selling location in their chain. */
+    private boolean canHeadquartersAccessChainLocation(
+            Long requestedVendorId, HttpServletRequest request, Authentication auth) {
+        try {
+            Vendor caller = resolveCallerVendor(request, auth);
+            if (caller == null
+                    || !Boolean.TRUE.equals(caller.getIsHeadquarters())
+                    || !Boolean.TRUE.equals(caller.getIsChainLocation())
+                    || caller.getChainId() == null) {
+                return false;
+            }
+            return vendorService.getVendorById(requestedVendorId)
+                    .filter(target -> caller.getChainId().equals(target.getChainId())
+                            && target.getAssignedLocationId() == null)
+                    .isPresent();
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    /**
+     * GatewayTrustFilter treats VENDOR_ADMIN as an "admin" (the role name contains "ADMIN"),
+     * so the principal is a bare username rather than CustomVendorDetails. Fall back to the
+     * gateway-provided user id and email to load the calling vendor.
+     */
+    private Vendor resolveCallerVendor(HttpServletRequest request, Authentication auth) {
+        Object principal = auth.getPrincipal();
+        if (principal instanceof CustomVendorDetails cvd && cvd.getVendor() != null) {
+            return cvd.getVendor();
+        }
+        if (request == null) return null;
+
+        Object reqUserId = request.getAttribute("userId");
+        Long callerId = null;
+        if (reqUserId instanceof Number n) {
+            callerId = n.longValue();
+        } else if (reqUserId != null) {
+            try {
+                callerId = Long.parseLong(reqUserId.toString());
+            } catch (NumberFormatException ignored) { }
+        }
+        if (callerId != null) {
+            Vendor byId = vendorService.getVendorById(callerId).orElse(null);
+            if (byId != null) return byId;
+        }
+
+        Object email = request.getAttribute("email");
+        if (email != null) {
+            return vendorService.findByEmail(email.toString()).orElse(null);
+        }
+        return null;
     }
 }

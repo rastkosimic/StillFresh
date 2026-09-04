@@ -43,7 +43,7 @@ public class Order {
     @Column(name = "payment_intent_id")
     private String paymentIntentId; // Stripe PaymentIntent ID for manual capture/cancel
 
-    /** Payment method used: "STRIPE" or "BANK_TRANSFER". */
+    /** How the customer paid: STRIPE, ALLSECURE, or BANK_TRANSFER (not vendor payout model). */
     @Column(name = "payment_method", length = 20)
     private String paymentMethod = "STRIPE";
 

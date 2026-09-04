@@ -2,6 +2,8 @@ server:
   port: 8080
 
 spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   main:
     allow-bean-definition-overriding: true
     web-application-type: reactive
@@ -22,10 +24,8 @@ spring:
 
   cloud:
     gateway:
-      discovery:
-        locator:
-          enabled: true
-          lower-case-service-id: true
+      # discovery.locator is profile-specific: enabling it exposes /<service-id>/** routes
+      # that bypass the explicit route table below, so it is off in prod.
       routes:
         - id: authorization-service
           uri: lb://authorization-service
@@ -94,7 +94,7 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: "*"
+        spring.json.trusted.packages: "com.stillfresh.app.sharedentities,com.stillfresh.app.sharedentities.dto,com.stillfresh.app.sharedentities.enums,com.stillfresh.app.sharedentities.offer.events,com.stillfresh.app.sharedentities.order.events,com.stillfresh.app.sharedentities.payment.events,com.stillfresh.app.sharedentities.shared.events,com.stillfresh.app.sharedentities.user.events,com.stillfresh.app.sharedentities.vendor.events"
     listener:
       missing-topics-fatal: false
 
@@ -103,16 +103,14 @@ gateway:
     # Feature flag to control rollout of local JWT validation at the gateway.
     # When set to false, the gateway will skip local JWT validation and rely on downstream services.
     local-validation-enabled: true
-  internal:
-    secret: ${GATEWAY_INTERNAL_SECRET:stillfresh-gw-dev-secret-change-in-prod}
 
 eureka:
   client:
     serviceUrl:
       defaultZone: http://eureka-server:8761/eureka
 
-jwt:
-  secret: ${JWT_SECRET:}
+# jwt.secret and gateway.internal.secret are profile-specific: prod requires them from the
+# environment with no fallback so a missing value fails startup instead of opening the trust boundary.
 
 authorization:
   topic:

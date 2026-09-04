@@ -1,0 +1,48 @@
+# Local development profile (docker-compose on a workstation).
+# Reproduces the behaviour the stack had before profiles were introduced, including the
+# AllSecure public simulator credentials and the stub payout rail.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+jwt:
+  secret: ${JWT_SECRET:}
+
+gateway:
+  internal:
+    secret: ${GATEWAY_INTERNAL_SECRET:stillfresh-gw-dev-secret-change-in-prod}
+
+stripe:
+  connect:
+    returnUrl: http://localhost:8083/vendors/stripe/return
+    refreshUrl: http://localhost:8083/vendors/stripe/refresh
+
+allsecure:
+  base-url: ${ALLSECURE_BASE_URL:https://asxgw.paymentsandbox.cloud}
+  api-key: ${ALLSECURE_API_KEY:genericmerchant-simulator-1}
+  shared-secret: ${ALLSECURE_SHARED_SECRET:}
+  username: ${ALLSECURE_USERNAME:genericmerchant-api-1}
+  password: ${ALLSECURE_PASSWORD:}
+  integration-key: ${ALLSECURE_INTEGRATION_KEY:sJBHPYLTFPNXjDYrQocG-1}
+  # Local dev: run `ngrok http 8080` and point this at the https forwarding URL.
+  public-base-url: ${ALLSECURE_PUBLIC_BASE_URL:http://localhost:8080}
+
+payout:
+  rail: ${PAYOUT_RAIL:stub}
+  auto:
+    enabled: ${PAYOUT_AUTO_ENABLED:true}
+    approve: ${PAYOUT_AUTO_APPROVE:true}
+    execute: ${PAYOUT_AUTO_EXECUTE:true}
+  cmiplus:
+    environment: ${CMIPLUS_ENVIRONMENT:sandbox}
+    stub-mode: ${CMIPLUS_STUB_MODE:true}
+
+logging:
+  level:
+    root: INFO
+
+internal:
+  service:
+    secret: ${INTERNAL_SERVICE_SECRET:stillfresh-internal-dev-secret-change-in-prod}

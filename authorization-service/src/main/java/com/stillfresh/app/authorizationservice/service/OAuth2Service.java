@@ -215,7 +215,10 @@ public class OAuth2Service {
                 user.getId(),
                 user.getUsername(),
                 user.getEmail(),
-                user.getPassword(),
+                // No password: Google users authenticate here, and user-service generates its own
+                // unguessable placeholder. Sending the hash would put it on the wire and into
+                // Feign request logs for no benefit.
+                null,
                 user.getRole().name(),
                 user.getStatus().name(),
                 profile.firstName(),

@@ -1,56 +1,33 @@
 package com.stillfresh.app.vendorservice.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.stillfresh.app.sharedentities.security.InternalServiceHeaders;
 
 import feign.RequestInterceptor;
-import feign.codec.ErrorDecoder;
-import feign.codec.Encoder;
-import feign.codec.Decoder;
-import feign.jackson.JacksonDecoder;
-import feign.jackson.JacksonEncoder;
-import jakarta.servlet.http.HttpServletRequest;
 
+/**
+ * Presents the shared internal secret on offer-service calls that are not publicly readable.
+ *
+ * <p>{@code /offers/stats/**} exposes per-vendor supply figures and {@code /offers/*//*all-offers}
+ * includes expired and sold-out listings. Ownership of the {@code vendorId} is enforced here in
+ * vendor-service; this header only proves the request came from a StillFresh service.
+ */
 @Configuration
 public class OfferServiceFeignConfig {
 
-    @Bean
-    public ObjectMapper objectMapper() {
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule()); // Handles OffsetDateTime serialization
-        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS); // Use ISO-8601 format
-        return objectMapper;
-    }
+    @Value("${internal.service.secret}")
+    private String internalServiceSecret;
 
     @Bean
-    public Encoder feignEncoder(ObjectMapper objectMapper) {
-        return new JacksonEncoder(objectMapper);
-    }
-
-    @Bean
-    public Decoder feignDecoder(ObjectMapper objectMapper) {
-        return new JacksonDecoder(objectMapper);
-    }
-
-    @Bean
-    public RequestInterceptor requestInterceptor() {
+    public RequestInterceptor offerServiceInternalInterceptor() {
         return requestTemplate -> {
-            ServletRequestAttributes attributes =
-                    (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-            if (attributes != null) {
-                HttpServletRequest request = attributes.getRequest();
-                String authorizationHeader = request.getHeader("Authorization");
-                if (authorizationHeader != null) {
-                    requestTemplate.header("Authorization", authorizationHeader);
-                }
+            String url = requestTemplate.url();
+            if (url.contains("/offers/stats/") || url.contains("/all-offers")) {
+                requestTemplate.header(InternalServiceHeaders.INTERNAL_SECRET, internalServiceSecret);
             }
         };
     }
 }
-

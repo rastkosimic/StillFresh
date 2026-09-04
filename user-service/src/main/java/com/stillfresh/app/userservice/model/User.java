@@ -1,5 +1,6 @@
 package com.stillfresh.app.userservice.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.stillfresh.app.sharedentities.enums.Role;
 import com.stillfresh.app.sharedentities.enums.Status;
 import com.stillfresh.app.sharedentities.interfaces.Account;
@@ -33,8 +34,12 @@ public class User implements Account{
     @NotEmpty(message = "Username is required")
     private String username;
 
+    // WRITE_ONLY: accepted on registration and profile updates, never serialized back out.
+    // Without this the BCrypt hash was returned in API responses wherever a controller
+    // returned the entity directly.
     @NotEmpty(message = "Password is required")
     @Size(min = 6, message = "Password should have at least 6 characters")
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 
     @NotEmpty(message = "Email is required")

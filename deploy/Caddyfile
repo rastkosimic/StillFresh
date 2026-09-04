@@ -1,0 +1,49 @@
+# TLS reverse proxy for production (Caddy).
+#
+# Set in .env.prod:
+#   PUBLIC_DOMAIN=api.example.com
+#   ADMIN_PUBLIC_DOMAIN=admin.example.com   (optional separate hostname)
+#   MARKETING_PUBLIC_DOMAIN=www.example.com (optional separate hostname)
+#
+# Caddy obtains certificates automatically when DNS points at this host.
+# For a first boot before DNS is ready, temporarily use:
+#   PUBLIC_DOMAIN=:80
+# and access the API over plain HTTP until certificates can be issued.
+
+{$PUBLIC_DOMAIN} {
+	encode gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	reverse_proxy api-gateway:8080
+}
+
+{$ADMIN_PUBLIC_DOMAIN} {
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+	reverse_proxy admin-web:80
+}
+
+{$MARKETING_PUBLIC_DOMAIN} {
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+	reverse_proxy marketing-web:80
+}

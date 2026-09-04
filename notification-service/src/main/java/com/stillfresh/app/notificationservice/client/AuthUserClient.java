@@ -4,6 +4,8 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
+import com.stillfresh.app.notificationservice.config.InternalServiceFeignConfig;
+
 import java.util.Map;
 
 /**
@@ -11,7 +13,7 @@ import java.util.Map;
  * which is the source of truth for user credentials. Used by the email-sending consumers
  * for events that only carry a userId (payments, bank transfers, cancellations).
  */
-@FeignClient(name = "authorization-service")
+@FeignClient(name = "authorization-service", configuration = InternalServiceFeignConfig.class)
 public interface AuthUserClient {
 
     /**

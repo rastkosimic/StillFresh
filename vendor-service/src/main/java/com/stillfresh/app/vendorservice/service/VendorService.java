@@ -17,10 +17,14 @@ import com.stillfresh.app.sharedentities.user.events.PasswordUpdateEvent;
 import com.stillfresh.app.sharedentities.vendor.events.UpdateVendorProfileEvent;
 import com.stillfresh.app.sharedentities.vendor.events.VendorRegisteredEvent;
 import com.stillfresh.app.sharedentities.vendor.events.VendorVerifiedEvent;
+import com.stillfresh.app.sharedentities.dto.VendorStatsResponse;
 import com.stillfresh.app.vendorservice.client.AuthorizationServiceClient;
 import com.stillfresh.app.vendorservice.client.OfferClient;
+import com.stillfresh.app.vendorservice.client.OrderClient;
+import com.stillfresh.app.vendorservice.dto.ChainLocationStatsResponse;
 import com.stillfresh.app.vendorservice.dto.DeleteVendorAccountRequest;
 import com.stillfresh.app.vendorservice.dto.PasswordChangeRequest;
+import com.stillfresh.app.vendorservice.dto.VendorProfileUpdateRequest;
 import com.stillfresh.app.vendorservice.model.PasswordResetToken;
 import com.stillfresh.app.vendorservice.model.Vendor;
 import com.stillfresh.app.vendorservice.model.VendorBalanceTransaction;
@@ -47,6 +51,8 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -56,6 +62,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -101,6 +108,9 @@ public class VendorService {
     
     @Autowired
     private OfferClient offerClient;
+
+    @Autowired
+    private OrderClient orderClient;
     
     @Autowired
     private AuthorizationServiceClient authorizationServiceClient;
@@ -1008,6 +1018,99 @@ public class VendorService {
         requireChainMembership(currentVendor);
         
         return findChainLocationRows(currentVendor.getChainId());
+    }
+
+    /**
+     * Sales statistics for all selling locations in a chain.
+     * HQ VENDOR_ADMIN: chain derived from authenticated vendor.
+     * SUPER_ADMIN: requires {@code chainId} query param.
+     */
+    public ChainLocationStatsResponse getChainLocationStats(OffsetDateTime from, OffsetDateTime to, String chainIdParam) {
+        String chainId;
+        String chainName;
+        List<Vendor> locations;
+
+        if (isSuperAdmin()) {
+            if (chainIdParam == null || chainIdParam.isBlank()) {
+                throw new IllegalArgumentException("chainId is required for SUPER_ADMIN");
+            }
+            chainId = chainIdParam.trim();
+            locations = findChainLocationRows(chainId);
+            if (locations.isEmpty()) {
+                throw new IllegalArgumentException("No locations found for chain: " + chainId);
+            }
+            chainName = locations.stream()
+                    .map(Vendor::getChainName)
+                    .filter(name -> name != null && !name.isBlank())
+                    .findFirst()
+                    .orElse(null);
+        } else {
+            Vendor currentVendor = getVendorFromContext();
+            requireChainMembership(currentVendor);
+            requireHeadquarters(currentVendor, "view chain stats");
+            chainId = currentVendor.getChainId();
+            chainName = currentVendor.getChainName();
+            locations = findChainLocationRows(chainId);
+        }
+
+        String fromStr = from != null ? from.toString() : null;
+        String toStr = to != null ? to.toString() : null;
+
+        ChainLocationStatsResponse response = new ChainLocationStatsResponse();
+        response.setChainId(chainId);
+        response.setChainName(chainName);
+        response.setFrom(from);
+        response.setTo(to);
+
+        List<ChainLocationStatsResponse.LocationStatsEntry> entries = new ArrayList<>();
+        long totalUnits = 0L;
+        long totalVendorEarnings = 0L;
+        long totalPlatformFee = 0L;
+        long totalGross = 0L;
+
+        for (Vendor location : locations) {
+            ChainLocationStatsResponse.LocationStatsEntry entry = new ChainLocationStatsResponse.LocationStatsEntry();
+            entry.setVendorId(location.getId());
+            entry.setLocationName(location.getLocationName());
+            entry.setIsHeadquarters(location.getIsHeadquarters());
+            try {
+                VendorStatsResponse stats = orderClient.getVendorStats(location.getId(), fromStr, toStr, null);
+                entry.setStats(stats);
+                if (stats != null) {
+                    totalUnits += stats.getTotalUnitsSold();
+                    totalVendorEarnings += stats.getTotalVendorEarningsCents();
+                    totalPlatformFee += stats.getTotalPlatformFeeCents();
+                    totalGross += stats.getTotalGrossRevenueCents();
+                }
+            } catch (Exception e) {
+                logger.warn("Chain stats unavailable for location {} ({}): {}",
+                        location.getId(), location.getLocationName(), e.getMessage());
+                entry.setError(e.getMessage() != null ? e.getMessage() : "Failed to load stats");
+            }
+            entries.add(entry);
+        }
+
+        response.setLocations(entries);
+        response.setChainTotals(new VendorStatsResponse(
+                totalUnits,
+                totalVendorEarnings,
+                totalPlatformFee,
+                totalGross,
+                List.of(),
+                from,
+                to
+        ));
+        return response;
+    }
+
+    private boolean isSuperAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) {
+            return false;
+        }
+        return auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch("ROLE_SUPER_ADMIN"::equals);
     }
     
     /**
@@ -2286,10 +2389,18 @@ public class VendorService {
         }
     }
 
-    public void updateVendorProfile(Vendor updatedVendor) {
+    /**
+     * Applies a vendor's self-service profile edit.
+     *
+     * <p>Takes a {@link VendorProfileUpdateRequest} rather than a {@code Vendor} on purpose: the
+     * request must not be able to carry {@code role}, {@code status}, {@code averageRating},
+     * {@code reviewsCount}, bank details, onboarding status or payout model. Role and status are
+     * changed only through the admin endpoints; ratings are derived from reviews.
+     */
+    public void updateVendorProfile(VendorProfileUpdateRequest updatedVendor) {
         Vendor currentVendor = getVendorFromContext();
         
-        // Track if sensitive data is changed (password, email, username, role)
+        // Track if sensitive data is changed (password, email, username)
         // These changes require re-authentication for security
         boolean sensitiveDataChanged = false;
         
@@ -2297,14 +2408,14 @@ public class VendorService {
         if (updatedVendor.getUsername() != null && !updatedVendor.getUsername().equals(currentVendor.getUsername())) {
             currentVendor.setUsername(updatedVendor.getUsername());
             sensitiveDataChanged = true; // Username is used for authentication
-            logger.info("Username changed for vendor: {}", currentVendor.getEmail());
+            logger.info("Username changed for vendorId: {}", currentVendor.getId());
         }
         
         // Check if email changed (if email field exists and is being updated)
         if (updatedVendor.getEmail() != null && !updatedVendor.getEmail().equals(currentVendor.getEmail())) {
             currentVendor.setEmail(updatedVendor.getEmail());
             sensitiveDataChanged = true; // Email is used for authentication
-            logger.info("Email changed for vendor: {}", currentVendor.getEmail());
+            logger.info("Email changed for vendorId: {}", currentVendor.getId());
         }
         
         if (updatedVendor.getAddress() != null) {
@@ -2316,15 +2427,7 @@ public class VendorService {
         if (updatedVendor.getPassword() != null) {
             currentVendor.setPassword(passwordEncoder.encode(updatedVendor.getPassword()));
             sensitiveDataChanged = true; // Password change requires re-authentication
-            logger.info("Password changed for vendor: {}", currentVendor.getEmail());
-        }
-        if (updatedVendor.getRole() != null && updatedVendor.getRole() != currentVendor.getRole()) {
-            currentVendor.setRole(updatedVendor.getRole());
-            sensitiveDataChanged = true; // Role change affects authorization
-            logger.info("Role changed for vendor: {} to {}", currentVendor.getEmail(), updatedVendor.getRole());
-        }
-        if (updatedVendor.getStatus() != null) {
-            currentVendor.setStatus(updatedVendor.getStatus());
+            logger.info("Password changed for vendorId: {}", currentVendor.getId());
         }
         if (updatedVendor.getBusinessType() != null) {
             currentVendor.setBusinessType(updatedVendor.getBusinessType());
@@ -2342,12 +2445,7 @@ public class VendorService {
         if (updatedVendor.getEnvironmentalCertifications() != null) {
             currentVendor.setEnvironmentalCertifications(updatedVendor.getEnvironmentalCertifications());
         }
-        if (updatedVendor.getAverageRating() != 0) {
-            currentVendor.setAverageRating(updatedVendor.getAverageRating());
-        }
-        if (updatedVendor.getReviewsCount() != 0) {
-            currentVendor.setReviewsCount(updatedVendor.getReviewsCount());
-        }
+        // averageRating and reviewsCount are derived from customer reviews, not self-reported.
         if (updatedVendor.getImageUrl() != null) {
             currentVendor.setImageUrl(updatedVendor.getImageUrl());
         }
@@ -2390,14 +2488,14 @@ public class VendorService {
         
         // Only logout and invalidate token if sensitive data was changed
         if (sensitiveDataChanged) {
-            logger.info("Sensitive data changed for vendor: {}. Logging out and invalidating token.", currentVendor.getEmail());
+            logger.info("Sensitive data changed for vendorId: {}. Logging out and invalidating token.", currentVendor.getId());
             try {
                 logoutAndInvalidateToken(extractTokenFromContext());
             } catch (Exception e) {
                 logger.warn("Failed to extract token for invalidation, but continuing with profile update: {}", e.getMessage());
             }
         } else {
-            logger.debug("No sensitive data changed for vendor: {}. User remains logged in.", currentVendor.getEmail());
+            logger.debug("No sensitive data changed for vendorId: {}. User remains logged in.", currentVendor.getId());
         }
     }
     

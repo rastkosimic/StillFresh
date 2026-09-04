@@ -1,6 +1,6 @@
 package com.stillfresh.app.orderservice.repository.projections;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 
 public interface CompletedOrderEarningsProjection {
     Long getOrderId();
@@ -12,5 +12,5 @@ public interface CompletedOrderEarningsProjection {
     Long getNetAmountCents();
     Double getFeePercentApplied();
     String getCurrency();
-    OffsetDateTime getSettledAt();
+    Instant getSettledAt();
 }

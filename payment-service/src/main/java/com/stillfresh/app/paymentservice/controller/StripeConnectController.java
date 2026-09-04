@@ -7,6 +7,8 @@ import com.stillfresh.app.paymentservice.dto.StripeConnectResponse;
 import com.stillfresh.app.paymentservice.dto.StripePayoutDto;
 import com.stillfresh.app.paymentservice.dto.StripeRequirementsDto;
 import com.stillfresh.app.paymentservice.dto.StripeTransactionDto;
+import com.stillfresh.app.paymentservice.security.CallerContext;
+import com.stillfresh.app.paymentservice.service.PaymentService;
 import com.stillfresh.app.paymentservice.service.StripeConnectService;
 import com.stripe.exception.StripeException;
 import java.util.List;
@@ -28,6 +30,28 @@ public class StripeConnectController {
     @Autowired
     private StripeConnectService stripeConnectService;
 
+    @Autowired
+    private CallerContext callerContext;
+
+    @Autowired
+    private PaymentService paymentService;
+
+    private boolean callerMayAccessAccount(String accountId) {
+        if (callerContext.isAdmin()) {
+            return true;
+        }
+        Long vendorId = callerContext.vendorId();
+        if (vendorId == null || accountId == null) {
+            return false;
+        }
+        String ownedAccountId = paymentService.getVendorStripeAccountId(vendorId);
+        return accountId.equals(ownedAccountId);
+    }
+
+    private <T> ResponseEntity<T> forbiddenAccountAccess() {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
+
     /**
      * Creates a Stripe Connect account for a vendor
      * @param vendorEmail Vendor's email address
@@ -38,12 +62,22 @@ public class StripeConnectController {
     public ResponseEntity<StripeConnectResponse> createConnectAccount(
             @RequestParam("vendorEmail") String vendorEmail,
             @RequestParam("vendorName") String vendorName) {
+        // A vendor may only onboard itself. Without this, a vendor could create a Connect
+        // account under another business's email address and complete onboarding for it.
+        if (!callerContext.isAdmin()) {
+            String callerEmail = callerContext.email();
+            if (callerEmail == null || !callerEmail.equalsIgnoreCase(vendorEmail)) {
+                logger.warn("Rejected Stripe Connect account creation for a different vendor email");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(new StripeConnectResponse("You can only create a Stripe account for your own vendor"));
+            }
+        }
         try {
-            logger.info("Creating Stripe Connect account for vendor: {} ({})", vendorName, vendorEmail);
+            logger.info("Creating Stripe Connect account for vendor: {}", vendorName);
             String accountId = stripeConnectService.createConnectAccount(vendorEmail, vendorName);
             return ResponseEntity.ok(new StripeConnectResponse(accountId));
         } catch (StripeException e) {
-            logger.error("Failed to create Stripe Connect account for vendor: {}. Error: {}", vendorEmail, e.getMessage());
+            logger.error("Failed to create Stripe Connect account for vendor: {}. Error: {}", vendorName, e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new StripeConnectResponse("Failed to create Stripe Connect account: " + e.getMessage()));
         } catch (Exception e) {
@@ -60,6 +94,9 @@ public class StripeConnectController {
      */
     @PostMapping(value = "/create-account-link", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<StripeConnectResponse> createAccountLink(@RequestParam("accountId") String accountId) {
+        if (!callerMayAccessAccount(accountId)) {
+            return forbiddenAccountAccess();
+        }
         try {
             logger.info("Creating account link for Stripe account: {}", accountId);
             String onboardingUrl = stripeConnectService.createAccountLink(accountId);
@@ -82,6 +119,9 @@ public class StripeConnectController {
      */
     @GetMapping("/account-ready/{accountId}")
     public ResponseEntity<Boolean> isAccountReady(@PathVariable String accountId) {
+        if (!callerMayAccessAccount(accountId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(false);
+        }
         try {
             boolean ready = stripeConnectService.isAccountReady(accountId);
             return ResponseEntity.ok(ready);
@@ -101,6 +141,9 @@ public class StripeConnectController {
      */
     @GetMapping("/account/{accountId}")
     public ResponseEntity<?> getAccountDetails(@PathVariable String accountId) {
+        if (!callerMayAccessAccount(accountId)) {
+            return forbiddenAccountAccess();
+        }
         try {
             logger.info("Retrieving account details for Stripe account: {}", accountId);
             StripeAccountDetailsDto accountDetails = stripeConnectService.getAccountDetails(accountId);
@@ -123,6 +166,9 @@ public class StripeConnectController {
      */
     @PostMapping(value = "/login-link/{accountId}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<StripeConnectResponse> createLoginLink(@PathVariable String accountId) {
+        if (!callerMayAccessAccount(accountId)) {
+            return forbiddenAccountAccess();
+        }
         try {
             logger.info("Creating login link for Stripe account: {}", accountId);
             String loginUrl = stripeConnectService.createLoginLink(accountId);
@@ -148,6 +194,9 @@ public class StripeConnectController {
     public ResponseEntity<?> getPayouts(
             @PathVariable String accountId,
             @RequestParam(value = "limit", required = false) Integer limit) {
+        if (!callerMayAccessAccount(accountId)) {
+            return forbiddenAccountAccess();
+        }
         try {
             logger.info("Retrieving payouts for Stripe account: {} (limit: {})", accountId, limit);
             List<StripePayoutDto> payouts = stripeConnectService.getPayouts(accountId, limit);
@@ -173,6 +222,9 @@ public class StripeConnectController {
     public ResponseEntity<?> getPayout(
             @PathVariable String accountId,
             @PathVariable String payoutId) {
+        if (!callerMayAccessAccount(accountId)) {
+            return forbiddenAccountAccess();
+        }
         try {
             logger.info("Retrieving payout {} for Stripe account: {}", payoutId, accountId);
             StripePayoutDto payout = stripeConnectService.getPayout(accountId, payoutId);
@@ -195,6 +247,9 @@ public class StripeConnectController {
      */
     @GetMapping("/balance/{accountId}")
     public ResponseEntity<?> getBalance(@PathVariable String accountId) {
+        if (!callerMayAccessAccount(accountId)) {
+            return forbiddenAccountAccess();
+        }
         try {
             logger.info("Retrieving balance for Stripe account: {}", accountId);
             StripeBalanceDto balance = stripeConnectService.getBalance(accountId);
@@ -217,6 +272,9 @@ public class StripeConnectController {
      */
     @GetMapping("/requirements/{accountId}")
     public ResponseEntity<?> getRequirements(@PathVariable String accountId) {
+        if (!callerMayAccessAccount(accountId)) {
+            return forbiddenAccountAccess();
+        }
         try {
             logger.info("Retrieving requirements for Stripe account: {}", accountId);
             StripeRequirementsDto requirements = stripeConnectService.getRequirements(accountId);
@@ -239,6 +297,9 @@ public class StripeConnectController {
      */
     @GetMapping("/bank-accounts/{accountId}")
     public ResponseEntity<?> getBankAccounts(@PathVariable String accountId) {
+        if (!callerMayAccessAccount(accountId)) {
+            return forbiddenAccountAccess();
+        }
         try {
             logger.info("Retrieving bank accounts for Stripe account: {}", accountId);
             List<StripeBankAccountDto> bankAccounts = stripeConnectService.getBankAccounts(accountId);
@@ -264,6 +325,9 @@ public class StripeConnectController {
     public ResponseEntity<?> createBankAccount(
             @PathVariable String accountId,
             @RequestParam("bankAccountToken") String bankAccountToken) {
+        if (!callerMayAccessAccount(accountId)) {
+            return forbiddenAccountAccess();
+        }
         try {
             logger.info("Creating bank account for Stripe account: {}", accountId);
             StripeBankAccountDto bankAccount = stripeConnectService.createBankAccount(accountId, bankAccountToken);
@@ -288,6 +352,9 @@ public class StripeConnectController {
     public ResponseEntity<?> deleteBankAccount(
             @PathVariable String accountId,
             @PathVariable String bankAccountId) {
+        if (!callerMayAccessAccount(accountId)) {
+            return forbiddenAccountAccess();
+        }
         try {
             logger.info("Deleting bank account {} for Stripe account: {}", bankAccountId, accountId);
             stripeConnectService.deleteBankAccount(accountId, bankAccountId);
@@ -315,6 +382,9 @@ public class StripeConnectController {
             @PathVariable String accountId,
             @PathVariable String bankAccountId,
             @RequestParam("currency") String currency) {
+        if (!callerMayAccessAccount(accountId)) {
+            return forbiddenAccountAccess();
+        }
         try {
             logger.info("Setting bank account {} as default for currency {} in account: {}", bankAccountId, currency, accountId);
             StripeBankAccountDto bankAccount = stripeConnectService.setDefaultBankAccount(accountId, bankAccountId, currency);
@@ -340,6 +410,9 @@ public class StripeConnectController {
     public ResponseEntity<?> getTransactions(
             @PathVariable String accountId,
             @RequestParam(value = "limit", required = false) Integer limit) {
+        if (!callerMayAccessAccount(accountId)) {
+            return forbiddenAccountAccess();
+        }
         try {
             logger.info("Retrieving transactions for Stripe account: {} (limit: {})", accountId, limit);
             List<StripeTransactionDto> transactions = stripeConnectService.getTransactions(accountId, limit);

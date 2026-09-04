@@ -434,6 +434,69 @@ After receiving credentials via email, the vendor logs in and completes onboardi
 ]
 ```
 
+### Get Chain Stats (HQ overview)
+
+**Endpoint**: `GET /vendors/chain/stats`
+
+**Authorization**: `VENDOR_ADMIN` (headquarters only) or `SUPER_ADMIN`
+
+**Query Parameters**:
+- `from` (optional): ISO-8601 offset datetime, e.g. `2026-01-01T00:00:00+01:00`
+- `to` (optional): ISO-8601 offset datetime
+- `chainId` (required for `SUPER_ADMIN` only): chain UUID to inspect
+
+**Access rules**:
+- **HQ `VENDOR_ADMIN`**: chain is derived from the authenticated vendor; branch admins receive `403`
+- **`SUPER_ADMIN`**: must pass `chainId`; can inspect any chain
+- Branch admins should continue using per-location `GET /vendors/stats` (unchanged)
+
+**Response** (200 OK):
+```json
+{
+  "chainId": "uuid-chain-id",
+  "chainName": "McDonald's",
+  "from": "2026-01-01T00:00:00+01:00",
+  "to": "2026-01-31T23:59:59+01:00",
+  "chainTotals": {
+    "totalUnitsSold": 150,
+    "totalVendorEarningsCents": 45000,
+    "totalPlatformFeeCents": 5000,
+    "totalGrossRevenueCents": 50000,
+    "breakdown": []
+  },
+  "locations": [
+    {
+      "vendorId": 124,
+      "locationName": "Downtown Location",
+      "isHeadquarters": true,
+      "stats": {
+        "totalUnitsSold": 80,
+        "totalVendorEarningsCents": 24000,
+        "totalPlatformFeeCents": 2600,
+        "totalGrossRevenueCents": 26600
+      }
+    },
+    {
+      "vendorId": 125,
+      "locationName": "Airport Location",
+      "isHeadquarters": false,
+      "stats": {
+        "totalUnitsSold": 70,
+        "totalVendorEarningsCents": 21000,
+        "totalPlatformFeeCents": 2400,
+        "totalGrossRevenueCents": 23400
+      }
+    }
+  ]
+}
+```
+
+**Partial failure**: If stats for one location cannot be loaded, that entry includes an `error` field while others still return `stats`. The HTTP response remains `200` and `chainTotals` sums only successful locations.
+
+**Errors**:
+- `400`: invalid date format, missing `chainId` for super admin, or unknown chain
+- `403`: branch admin attempted to view chain-wide stats
+
 ### Update Location
 
 **Endpoint**: `PUT /vendors/chain/locations/{locationId}`

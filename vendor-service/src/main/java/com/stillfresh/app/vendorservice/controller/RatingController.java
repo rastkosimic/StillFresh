@@ -94,7 +94,7 @@ public class RatingController {
     })
     @SecurityRequirement(name = "bearerAuth")
     @GetMapping("/vendor/{vendorId}")
-    @PreAuthorize("hasAnyRole('USER', 'VENDOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('USER', 'VENDOR', 'VENDOR_ADMIN', 'ADMIN')")
     public ResponseEntity<List<RatingResponse>> getRatingsByVendorId(
             @Parameter(description = "Vendor ID", required = true)
             @PathVariable Long vendorId) {
@@ -132,7 +132,7 @@ public class RatingController {
     })
     @SecurityRequirement(name = "bearerAuth")
     @GetMapping("/vendor/{vendorId}/summary")
-    @PreAuthorize("hasAnyRole('USER', 'VENDOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('USER', 'VENDOR', 'VENDOR_ADMIN', 'ADMIN')")
     public ResponseEntity<VendorRatingSummary> getVendorRatingSummary(
             @Parameter(description = "Vendor ID", required = true)
             @PathVariable Long vendorId) {

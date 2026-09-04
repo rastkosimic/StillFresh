@@ -15,6 +15,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import com.stillfresh.app.paymentservice.security.GatewayTrustFilter;
+import com.stillfresh.app.paymentservice.security.InternalServiceFilter;
+import com.stillfresh.app.paymentservice.security.StripeConnectOwnershipFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -24,6 +26,14 @@ public class WebSecurityConfig {
     @Autowired
     @Lazy
     private GatewayTrustFilter gatewayTrustFilter;
+
+    @Autowired
+    @Lazy
+    private StripeConnectOwnershipFilter stripeConnectOwnershipFilter;
+
+    @Autowired
+    @Lazy
+    private InternalServiceFilter internalServiceFilter;
 
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
@@ -43,14 +53,22 @@ public class WebSecurityConfig {
                 // AllSecure callback/return: no JWT, but GatewayTrustFilter requires X-Gateway-Secret (request must
                 // transit the API gateway). Callback HMAC is verified inside AllSecureController.
                 .requestMatchers("/payment/allsecure/callback", "/payment/allsecure/return").permitAll()
+                // Stripe Connect onboarding and account management. Only vendors manage their own
+                // account; StripeConnectOwnershipFilter checks which account is being addressed.
+                .requestMatchers("/api/payment/stripe/connect/**")
+                    .hasAnyRole("VENDOR", "VENDOR_ADMIN", "ADMIN", "SUPER_ADMIN")
                 .requestMatchers("/payment/**", "/admin/**", "/ledger/**", "/payment/bank-transfer/**").authenticated()
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
-        // Use GatewayTrustFilter - trusts API Gateway for authentication
-        // Gateway validates JWT and adds X-* headers, this filter extracts user info from headers
+        // addFilterBefore/After only accept Spring Security's own filters as the anchor.
+        // GatewayTrustFilter is custom, so it cannot be the second argument.
+        // InternalServiceFilter is registered after GatewayTrustFilter so a valid internal
+        // secret wins over a forwarded end-user JWT on vendor-service Feign calls.
         http.addFilterBefore(gatewayTrustFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(internalServiceFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterAfter(stripeConnectOwnershipFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

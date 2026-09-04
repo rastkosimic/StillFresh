@@ -20,9 +20,15 @@ CREATE TABLE IF NOT EXISTS roles (
     name VARCHAR(50) UNIQUE NOT NULL
 );
 
--- Insert initial super-admin user (bcrypt hash; rotate via app after first login)
-INSERT INTO users (username, email, password, role, active) VALUES
-('super admin', 'super_admin@stillfresh.com', '$2a$10$l4y6sYVoBMkcsvOJi8wx/.WQZUPDj9qPjNeWuoDWOcOKxACIYayQ6', 'SUPER_ADMIN', 'ACTIVE');
+-- No super-admin is seeded here. This file is git-tracked, so any password hash committed to it
+-- is public and would give every deployment the same known admin credentials.
+--
+-- Provision the first SUPER_ADMIN once, after the stack is up:
+--   1. Set ADMIN_BOOTSTRAP_TOKEN to a random value in the env file and start authorization-service.
+--   2. POST /admin/create-initial-admin with header X-Admin-Bootstrap-Token and a body of
+--      {"username": "...", "email": "...", "password": "..."}.
+--   3. Remove ADMIN_BOOTSTRAP_TOKEN and restart. The endpoint then refuses all callers, and it
+--      already refuses once a SUPER_ADMIN exists.
 
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role::text = ANY (ARRAY['USER'::character varying, 'ADMIN'::character varying, 'SUPER_ADMIN'::character varying, 'VENDOR'::character varying, 'VENDOR_ADMIN'::character varying]::text[]));

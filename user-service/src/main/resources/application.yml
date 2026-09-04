@@ -2,6 +2,8 @@ server:
   port: 8081
 
 spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   main:
     allow-bean-definition-overriding: true
   application:
@@ -12,9 +14,7 @@ spring:
     username: stillfreshuser
     password: ${POSTGRES_PASSWORD_USER:}
   jpa:
-    hibernate:
-      ddl-auto: update #update for production
-    show-sql: false
+    # ddl-auto and show-sql are profile-specific (see application-dev.yml / application-prod.yml)
     database-platform: org.hibernate.dialect.PostgreSQLDialect
   kafka:
     bootstrap-servers: ${KAFKA_BROKER:kafka:9092}
@@ -24,7 +24,7 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       auto-offset-reset: earliest
       properties:
-        spring.json.trusted.packages: com.stillfresh.app.sharedentities.*
+        spring.json.trusted.packages: "com.stillfresh.app.sharedentities,com.stillfresh.app.sharedentities.dto,com.stillfresh.app.sharedentities.enums,com.stillfresh.app.sharedentities.offer.events,com.stillfresh.app.sharedentities.order.events,com.stillfresh.app.sharedentities.payment.events,com.stillfresh.app.sharedentities.shared.events,com.stillfresh.app.sharedentities.user.events,com.stillfresh.app.sharedentities.vendor.events"
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -62,8 +62,12 @@ mailgun:
   base-url: ${MAILGUN_BASE_URL:https://api.mailgun.net/v3}
 
 jwt:
-  secret: ${JWT_SECRET:}
+  # jwt.secret is profile-specific: prod requires it from the environment with no fallback.
   expiration: 3600000
+
+# Public base URL used to build password-reset links in outbound email.
+app:
+  public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
 
 authorization:
   topic:
@@ -82,6 +86,7 @@ user:
 strikes:
   suspension-threshold: 3
 
-gateway:
-  internal:
-    secret: ${GATEWAY_INTERNAL_SECRET:stillfresh-gw-dev-secret-change-in-prod}
+# gateway.internal.secret is profile-specific: prod requires it from the environment
+# with no fallback so a missing value fails startup.
+# internal.service.secret authenticates service-to-service calls that carry no end-user JWT.
+# Profile-specific: prod requires it from the environment with no fallback.

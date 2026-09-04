@@ -1,0 +1,44 @@
+# Production profile.
+# Secrets are intentionally declared without defaults: an unset variable fails placeholder
+# resolution at startup rather than silently falling back to a known dev value.
+spring:
+  jpa:
+    hibernate:
+      # Schema changes go through migrations, not Hibernate. `validate` fails fast on drift.
+      ddl-auto: validate
+    # show-sql must stay false: Hibernate SQL logging exposes vendor PII and bank fields.
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+app:
+  base-url: ${APP_PUBLIC_BASE_URL}
+
+vendor:
+  login-url: ${APP_PUBLIC_BASE_URL}/auth/login
+
+jwt:
+  secret: ${JWT_SECRET}
+
+gateway:
+  internal:
+    secret: ${GATEWAY_INTERNAL_SECRET}
+
+logging:
+  level:
+    root: INFO
+    '[com.stillfresh.app]': INFO
+    '[org.hibernate.SQL]': WARN
+    feign: WARN
+    '[com.stillfresh.app.vendorservice.client]': WARN
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+internal:
+  service:
+    secret: ${INTERNAL_SERVICE_SECRET}

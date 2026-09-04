@@ -7,6 +7,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import com.stillfresh.app.orderservice.service.OrderService;
+import com.stillfresh.app.sharedentities.logging.LogSanitizer;
 import com.stillfresh.app.sharedentities.payment.events.PaymentSuccessEvent;
 
 @Component
@@ -18,11 +19,12 @@ public class PaymentSuccessListener {
 
 	@KafkaListener(topics = "${payment.topic.name:payment-success-topic}", groupId = "order-service-group")
 	public void handlePaymentSuccessEvent(PaymentSuccessEvent event) {
-		logger.info("Received PaymentSuccessEvent for userId: {}, offerId: {}, paymentIntentId: {}", 
-				event.getUserId(), event.getOfferId(), event.getPaymentIntentId());
+		logger.info("Received PaymentSuccessEvent requestId={}, userId={}, offerId={}, paymentRef={}",
+				event.getRequestId(), event.getUserId(), event.getOfferId(),
+				LogSanitizer.maskPaymentReference(event.getPaymentIntentId()));
 		try {
 			// finalize the order with PaymentIntent ID for manual capture
-			orderService.finalizeOrder(event.getRequestId(), event.getPaymentIntentId());
+			orderService.finalizeOrder(event.getRequestId(), event.getPaymentIntentId(), event.getPaymentProvider());
 		} catch (Exception e) {
 			logger.error("Failed to process order for userId: {}, offerId: {}", event.getUserId(), event.getOfferId(),
 					e);

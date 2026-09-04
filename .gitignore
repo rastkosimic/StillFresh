@@ -22,6 +22,10 @@ ehthumbs.db
 # Log files
 *.log
 
+# JVM crash dumps (may contain local paths and memory contents)
+hs_err_pid*.log
+replay_pid*.log
+
 # Temporary files
 tmp/
 *.tmp
@@ -35,6 +39,21 @@ tmp/
 
 # Environment variable files
 .env
+.env.prod
+.env.local
+.env.*.local
+
+# Service-account credentials — never commit these
+firebase-credentials.json
+firebase-credentials.json/
+**/*firebase*service-account*.json
+**/*-adminsdk-*.json
+
+# Keystores and private keys
+*.p12
+*.jks
+*.pem
+*.key
 
 # Generated Postgres init SQL (from db-init/templates via scripts/generate-init-sql.*)
 /init-user.sql
@@ -49,5 +68,6 @@ tmp/
 # OS-specific files
 .DS_Store
 
-# YAML files
-.yml
+# Frontend build artifacts
+node_modules/
+*.tsbuildinfo

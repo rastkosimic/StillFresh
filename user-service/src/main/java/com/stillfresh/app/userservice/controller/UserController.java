@@ -481,7 +481,8 @@ public class UserController {
     public ResponseEntity<?> createOAuth2User(@RequestBody User user) {
         try {
             User createdUser = userService.createOAuth2User(user);
-            return ResponseEntity.ok(createdUser);
+            // Return only the identifier the caller needs rather than the whole entity.
+            return ResponseEntity.ok(Map.of("id", createdUser.getId()));
         } catch (Exception ex) {
             logger.error("Failed to create OAuth2 user: {}", ex.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

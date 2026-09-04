@@ -85,7 +85,8 @@ public class OrderEventPublisher {
      */
     public void publishOfferDetailsRequestedEvent(OfferDetailsRequestedEvent event) {
         try {
-            logger.info("Publishing OfferDetailsRequestedEvent to Kafka topic '{}': {}", offerDetailsRequestTopic, event);
+            logger.info("Publishing OfferDetailsRequestedEvent to Kafka topic '{}': requestId={}",
+                    offerDetailsRequestTopic, event.getRequestId());
             kafkaTemplate.send(offerDetailsRequestTopic, event);
         } catch (Exception e) {
             logger.error("Failed to publish OfferDetailsRequestedEvent to Kafka", e);
@@ -99,7 +100,8 @@ public class OrderEventPublisher {
      */
     public void publishOfferQuantityUpdatedEvent(OfferQuantityUpdatedEvent event) {
         try {
-            logger.info("Publishing OfferQuantityUpdatedEvent to Kafka topic '{}': {}", offerQuantityUpdatedTopic, event);
+            logger.info("Publishing OfferQuantityUpdatedEvent to Kafka topic '{}': offerId={}",
+                    offerQuantityUpdatedTopic, event.getOfferId());
             kafkaTemplate.send(offerQuantityUpdatedTopic, event);
         } catch (Exception e) {
             logger.error("Failed to publish OfferQuantityUpdatedEvent to Kafka", e);
@@ -113,7 +115,8 @@ public class OrderEventPublisher {
      */
     public void publishOrderPlacedEvent(OrderPlacedEvent event) {
         try {
-            logger.info("Publishing OrderPlacedEvent to Kafka topic '{}': {}", orderPlacedTopic, event);
+            logger.info("Publishing OrderPlacedEvent to Kafka topic '{}': orderId={}",
+                    orderPlacedTopic, event.getOrderId());
             kafkaTemplate.send(orderPlacedTopic, event);
         } catch (Exception e) {
             logger.error("Failed to publish OrderPlacedEvent to Kafka", e);
@@ -131,7 +134,8 @@ public class OrderEventPublisher {
 
     public void publishPaymentRequestEvent(PaymentRequestEvent event) {
         try {
-            logger.info("Publishing PaymentRequestEvent to Kafka topic '{}': {}", paymentRequestTopic, event);
+            logger.info("Publishing PaymentRequestEvent to Kafka topic '{}': requestId={}",
+                    paymentRequestTopic, event.getRequestId());
             kafkaTemplate.send(paymentRequestTopic, event);
         } catch (Exception e) {
             logger.error("Failed to publish PaymentRequestEvent to Kafka", e);
@@ -140,7 +144,8 @@ public class OrderEventPublisher {
 
     public void publishVendorStatsResponse(VendorStatsResponseEvent event) {
         try {
-            logger.info("Publishing VendorStatsResponseEvent to Kafka topic '{}': {}", vendorStatsResponseTopic, event);
+            logger.info("Publishing VendorStatsResponseEvent to Kafka topic '{}': correlationId={}",
+                    vendorStatsResponseTopic, event.getCorrelationId());
             kafkaTemplate.send(vendorStatsResponseTopic, event);
         } catch (Exception e) {
             logger.error("Failed to publish VendorStatsResponseEvent to Kafka", e);
@@ -154,7 +159,8 @@ public class OrderEventPublisher {
      */
     public void publishVendorOrderNotificationEvent(VendorOrderNotificationEvent event) {
         try {
-            logger.info("Publishing VendorOrderNotificationEvent to Kafka topic '{}': {}", vendorOrderNotificationTopic, event);
+            logger.info("Publishing VendorOrderNotificationEvent to Kafka topic '{}': orderId={}",
+                    vendorOrderNotificationTopic, event.getOrderId());
             kafkaTemplate.send(vendorOrderNotificationTopic, event);
         } catch (Exception e) {
             logger.error("Failed to publish VendorOrderNotificationEvent to Kafka", e);
@@ -169,7 +175,8 @@ public class OrderEventPublisher {
      */
     public void publishPaymentCancelRequest(PaymentCancelRequestEvent event) {
         try {
-            logger.info("Publishing PaymentCancelRequestEvent to Kafka topic '{}': {}", paymentCancelRequestTopic, event);
+            logger.info("Publishing PaymentCancelRequestEvent to Kafka topic '{}': orderId={}",
+                    paymentCancelRequestTopic, event.getOrderId());
             kafkaTemplate.send(paymentCancelRequestTopic, event);
         } catch (Exception e) {
             logger.error("Failed to publish PaymentCancelRequestEvent to Kafka", e);
@@ -181,7 +188,8 @@ public class OrderEventPublisher {
      */
     public void publishPaymentCaptureRequest(PaymentCaptureRequestEvent event) {
         try {
-            logger.info("Publishing PaymentCaptureRequestEvent to Kafka topic '{}': {}", paymentCaptureRequestTopic, event);
+            logger.info("Publishing PaymentCaptureRequestEvent to Kafka topic '{}': orderId={}",
+                    paymentCaptureRequestTopic, event.getOrderId());
             kafkaTemplate.send(paymentCaptureRequestTopic, event);
         } catch (Exception e) {
             logger.error("Failed to publish PaymentCaptureRequestEvent to Kafka", e);
@@ -195,7 +203,8 @@ public class OrderEventPublisher {
      */
     public void publishOrderCancelledEvent(OrderCancelledEvent event) {
         try {
-            logger.info("Publishing OrderCancelledEvent to Kafka topic '{}': {}", orderCancelledTopic, event);
+            logger.info("Publishing OrderCancelledEvent to Kafka topic '{}': orderId={}",
+                    orderCancelledTopic, event.getOrderId());
             kafkaTemplate.send(orderCancelledTopic, event);
         } catch (Exception e) {
             logger.error("Failed to publish OrderCancelledEvent to Kafka", e);
@@ -208,7 +217,8 @@ public class OrderEventPublisher {
      */
     public void publishOrderExpiredEvent(OrderExpiredEvent event) {
         try {
-            logger.info("Publishing OrderExpiredEvent to Kafka topic '{}': {}", orderExpiredTopic, event);
+            logger.info("Publishing OrderExpiredEvent to Kafka topic '{}': orderId={}",
+                    orderExpiredTopic, event.getOrderId());
             kafkaTemplate.send(orderExpiredTopic, event);
         } catch (Exception e) {
             logger.error("Failed to publish OrderExpiredEvent to Kafka", e);
@@ -221,7 +231,8 @@ public class OrderEventPublisher {
      */
     public void publishOrderPickupReminderEvent(OrderPickupReminderEvent event) {
         try {
-            logger.info("Publishing OrderPickupReminderEvent to Kafka topic '{}': {}", orderPickupReminderTopic, event);
+            logger.info("Publishing OrderPickupReminderEvent to Kafka topic '{}': orderId={}",
+                    orderPickupReminderTopic, event.getOrderId());
             kafkaTemplate.send(orderPickupReminderTopic, event);
         } catch (Exception e) {
             logger.error("Failed to publish OrderPickupReminderEvent to Kafka", e);
@@ -234,7 +245,8 @@ public class OrderEventPublisher {
      */
     public void publishFraudFlagEvent(FraudFlagEvent event) {
         try {
-            logger.info("Publishing FraudFlagEvent to Kafka topic '{}': {}", fraudFlagTopic, event);
+            logger.info("Publishing FraudFlagEvent to Kafka topic '{}': orderId={}",
+                    fraudFlagTopic, event.getOrderId());
             kafkaTemplate.send(fraudFlagTopic, event);
         } catch (Exception e) {
             logger.error("Failed to publish FraudFlagEvent to Kafka", e);
@@ -247,7 +259,8 @@ public class OrderEventPublisher {
      */
     public void publishOrderNoShowEvent(OrderNoShowEvent event) {
         try {
-            logger.info("Publishing OrderNoShowEvent to Kafka topic '{}': {}", orderNoShowTopic, event);
+            logger.info("Publishing OrderNoShowEvent to Kafka topic '{}': orderId={}",
+                    orderNoShowTopic, event.getOrderId());
             kafkaTemplate.send(orderNoShowTopic, event);
         } catch (Exception e) {
             logger.error("Failed to publish OrderNoShowEvent to Kafka", e);

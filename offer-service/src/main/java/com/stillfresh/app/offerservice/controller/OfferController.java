@@ -7,7 +7,11 @@ import com.stillfresh.app.sharedentities.exceptions.ResourceNotFoundException;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -84,9 +88,21 @@ public class OfferController {
     }
 
     @DeleteMapping("/{id}")
-    public String deleteOffer(@PathVariable Long id) {
-        offerService.deleteOffer(id);
+    public String deleteOffer(
+            @PathVariable Long id,
+            @RequestAttribute(name = "userId", required = false) Long callerVendorId) {
+        offerService.deleteOffer(id, callerVendorId, isAdmin());
         return "Offer deleted";
+    }
+
+    private boolean isAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) {
+            return false;
+        }
+        return auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(r -> r.equals("ROLE_ADMIN") || r.equals("ROLE_SUPER_ADMIN"));
     }
     
     @GetMapping("/categories")

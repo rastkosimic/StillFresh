@@ -24,6 +24,7 @@ import com.stillfresh.app.sharedentities.order.events.OrderPlacedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -51,8 +52,12 @@ public class OrderService {
 	@Autowired
     private OrderEventPublisher eventPublisher;
 
-	@Autowired
+    @Autowired
     private GeoFenceService geoFenceService;
+
+    /** Fallback when {@link PaymentSuccessEvent} has no provider (legacy events). Mirrors payment-service. */
+    @Value("${payment.provider:stripe}")
+    private String defaultPaymentProvider;
 	
 	public final ConcurrentHashMap<String, CompletableFuture<OfferDto>> pendingOfferDetailsRequests = new ConcurrentHashMap<>();
 	
@@ -324,11 +329,16 @@ public class OrderService {
     }
     
     public void finalizeOrder(String requestId) {
-        finalizeOrder(requestId, null);
+        finalizeOrder(requestId, null, null);
     }
 
     public void finalizeOrder(String requestId, String paymentIntentId) {
-        logger.info("Finalizing order for requestId: {}, paymentIntentId: {}", requestId, paymentIntentId);
+        finalizeOrder(requestId, paymentIntentId, null);
+    }
+
+    public void finalizeOrder(String requestId, String paymentIntentId, String paymentProvider) {
+        logger.info("Finalizing order for requestId: {}, paymentIntentId: {}, paymentProvider: {}",
+                requestId, paymentIntentId, paymentProvider);
 
         // ✅ Remove pending order request before processing
         CompletableFuture<OrderRequestEvent> futureOrder = pendingOrderRequests.remove(requestId);
@@ -370,6 +380,7 @@ public class OrderService {
                 
                 order.setPaymentIntentId(paymentIntentId);  // Store PaymentIntent ID for later capture/cancel
                 order.setStatus("CONFIRMED");  // Set status to CONFIRMED after payment
+                order.setPaymentMethod(resolveOrderPaymentMethod(orderEvent, paymentProvider));
 
                 // Set pickup deadline for expiry and reminder logic (same day + offer pickup end time, or offer expiration)
                 if (offer != null) {
@@ -435,6 +446,27 @@ public class OrderService {
         }
     }
 
+
+    /**
+     * Maps the active payment provider (from payment-service) or the customer's
+     * chosen method to the persisted {@code orders.payment_method} value.
+     * This reflects how the customer paid, not the vendor's payout model (MoR vs Connect).
+     */
+    private String resolveOrderPaymentMethod(OrderRequestEvent orderEvent, String paymentProvider) {
+        if (orderEvent != null && "BANK_TRANSFER".equalsIgnoreCase(orderEvent.getPaymentMethod())) {
+            return "BANK_TRANSFER";
+        }
+        String provider = (paymentProvider != null && !paymentProvider.isBlank())
+                ? paymentProvider
+                : defaultPaymentProvider;
+        if ("allsecure".equalsIgnoreCase(provider)) {
+            return "ALLSECURE";
+        }
+        if ("stripe".equalsIgnoreCase(provider)) {
+            return "STRIPE";
+        }
+        return provider.toUpperCase();
+    }
 
     public void cancelOrder(String requestId) {
         logger.warn("Cancelling order for requestId: {}", requestId);

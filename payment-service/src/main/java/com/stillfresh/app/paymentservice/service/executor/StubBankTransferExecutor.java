@@ -1,5 +1,7 @@
 package com.stillfresh.app.paymentservice.service.executor;
 
+import com.stillfresh.app.sharedentities.logging.LogSanitizer;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,13 +30,12 @@ public class StubBankTransferExecutor implements BankTransferExecutor {
     @Override
     public PayoutTransferResult execute(PayoutTransferRequest request) {
         logger.info(
-            "[STUB] Bank transfer — idempotencyKey={} vendorPayoutItemId={} iban={} amount={} {} description={}",
+            "[STUB] Bank transfer — idempotencyKey={} vendorPayoutItemId={} iban={} amount={} {}",
             request.getIdempotencyKey(),
             request.getVendorPayoutItemId(),
-            request.getTargetIban(),
+            LogSanitizer.maskIban(request.getTargetIban()),
             request.getAmountCents(),
-            request.getCurrency(),
-            request.getDescription()
+            request.getCurrency()
         );
 
         if (simulateFailure) {

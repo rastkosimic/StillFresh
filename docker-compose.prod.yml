@@ -1,0 +1,263 @@
+# Production overlay for docker-compose.yml.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# Unpublishes every service and infrastructure port from the host. Only the TLS reverse proxy
+# binds 80/443. All Spring services run with SPRING_PROFILES_ACTIVE=prod.
+
+services:
+  kafka:
+    ports: !reset []
+    restart: unless-stopped
+
+  user-postgres:
+    ports: !reset []
+    volumes:
+      - user_postgres_data:/var/lib/postgresql/data
+      - ./init-user.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+  vendor-postgres:
+    ports: !reset []
+    volumes:
+      - vendor_postgres_data:/var/lib/postgresql/data
+      - ./init-vendor.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+  auth-postgres:
+    ports: !reset []
+    volumes:
+      - auth_postgres_data:/var/lib/postgresql/data
+      - ./init-auth.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+  offer-postgres:
+    ports: !reset []
+    volumes:
+      - offer_postgres_data:/var/lib/postgresql/data
+      - ./init-offer.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+  order-postgres:
+    ports: !reset []
+    volumes:
+      - order_postgres_data:/var/lib/postgresql/data
+      - ./init-order.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+  payment-postgres:
+    ports: !reset []
+    volumes:
+      - payment_postgres_data:/var/lib/postgresql/data
+      - ./init-payment.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+  notification-postgres:
+    ports: !reset []
+    volumes:
+      - notification_postgres_data:/var/lib/postgresql/data
+      - ./init-notification.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+  redis:
+    ports: !reset []
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    restart: unless-stopped
+
+  eureka-server:
+    ports: !reset []
+    expose:
+      - "8761"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+    restart: unless-stopped
+
+  api-gateway:
+    ports: !reset []
+    expose:
+      - "8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - JWT_SECRET=${JWT_SECRET}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+    restart: unless-stopped
+
+  user-service:
+    ports: !reset []
+    expose:
+      - "8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - KAFKA_BROKER=kafka:9092
+      - JWT_SECRET=${JWT_SECRET}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - INTERNAL_SERVICE_SECRET=${INTERNAL_SERVICE_SECRET}
+      - POSTGRES_PASSWORD_USER=${POSTGRES_PASSWORD_USER}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY}
+      - MAILGUN_DOMAIN=${MAILGUN_DOMAIN}
+      - MAILGUN_FROM_EMAIL=${MAILGUN_FROM_EMAIL}
+      - MAILGUN_BASE_URL=${MAILGUN_BASE_URL:-https://api.mailgun.net/v3}
+      - APP_PUBLIC_BASE_URL=${APP_PUBLIC_BASE_URL}
+    restart: unless-stopped
+
+  vendor-service:
+    ports: !reset []
+    expose:
+      - "8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - KAFKA_BROKER=kafka:9092
+      - JWT_SECRET=${JWT_SECRET}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - INTERNAL_SERVICE_SECRET=${INTERNAL_SERVICE_SECRET}
+      - POSTGRES_PASSWORD_VENDOR=${POSTGRES_PASSWORD_VENDOR}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY}
+      - MAILGUN_DOMAIN=${MAILGUN_DOMAIN}
+      - MAILGUN_FROM_EMAIL=${MAILGUN_FROM_EMAIL}
+      - MAILGUN_BASE_URL=${MAILGUN_BASE_URL:-https://api.mailgun.net/v3}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      - APP_PUBLIC_BASE_URL=${APP_PUBLIC_BASE_URL}
+    restart: unless-stopped
+
+  authorization-service:
+    ports: !reset []
+    expose:
+      - "8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - KAFKA_BROKER=kafka:9092
+      - JWT_SECRET=${JWT_SECRET}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - INTERNAL_SERVICE_SECRET=${INTERNAL_SERVICE_SECRET}
+      - POSTGRES_PASSWORD_AUTH=${POSTGRES_PASSWORD_AUTH}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY}
+      - MAILGUN_DOMAIN=${MAILGUN_DOMAIN}
+      - MAILGUN_FROM_EMAIL=${MAILGUN_FROM_EMAIL}
+      - MAILGUN_BASE_URL=${MAILGUN_BASE_URL:-https://api.mailgun.net/v3}
+      - APP_PUBLIC_BASE_URL=${APP_PUBLIC_BASE_URL}
+      - ADMIN_BOOTSTRAP_TOKEN=${ADMIN_BOOTSTRAP_TOKEN:-}
+    restart: unless-stopped
+
+  offer-service:
+    ports: !reset []
+    expose:
+      - "8084"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - KAFKA_BROKER=kafka:9092
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - INTERNAL_SERVICE_SECRET=${INTERNAL_SERVICE_SECRET}
+      - POSTGRES_PASSWORD_OFFERS=${POSTGRES_PASSWORD_OFFERS}
+    restart: unless-stopped
+
+  order-service:
+    ports: !reset []
+    expose:
+      - "8085"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - KAFKA_BROKER=kafka:9092
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - INTERNAL_SERVICE_SECRET=${INTERNAL_SERVICE_SECRET}
+      - POSTGRES_PASSWORD_ORDERS=${POSTGRES_PASSWORD_ORDERS}
+      - PAYMENT_PROVIDER=${PAYMENT_PROVIDER}
+    restart: unless-stopped
+
+  payment-service:
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - KAFKA_BROKER=kafka:9092
+      - JWT_SECRET=${JWT_SECRET}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - POSTGRES_PASSWORD_PAYMENTS=${POSTGRES_PASSWORD_PAYMENTS}
+      - STRIPE_API_KEY=${STRIPE_API_KEY}
+      - PAYOUT_SCHEDULE_CRON=${PAYOUT_SCHEDULE_CRON}
+      - PAYOUT_DEFAULT_CURRENCY=${PAYOUT_DEFAULT_CURRENCY}
+      - PLATFORM_IBAN=${PLATFORM_IBAN}
+      - PLATFORM_BANK_NAME=${PLATFORM_BANK_NAME}
+      - PLATFORM_ACCOUNT_HOLDER=${PLATFORM_ACCOUNT_HOLDER}
+      - BANK_TRANSFER_EXPIRY_HOURS=${BANK_TRANSFER_EXPIRY_HOURS}
+      - PAYOUT_MAX_BATCH_AMOUNT_CENTS=${PAYOUT_MAX_BATCH_AMOUNT_CENTS}
+      - PAYOUT_RAIL=${PAYOUT_RAIL}
+      - PAYOUT_AUTO_ENABLED=${PAYOUT_AUTO_ENABLED}
+      - PAYOUT_AUTO_APPROVE=${PAYOUT_AUTO_APPROVE}
+      - PAYOUT_AUTO_EXECUTE=${PAYOUT_AUTO_EXECUTE}
+      - PAYOUT_SEPA_XML_OUTPUT_DIR=${PAYOUT_SEPA_XML_OUTPUT_DIR}
+      - CMIPLUS_STUB_MODE=${CMIPLUS_STUB_MODE}
+      - CMIPLUS_BASE_URL=${CMIPLUS_BASE_URL}
+      - CMIPLUS_CLIENT_ID=${CMIPLUS_CLIENT_ID}
+      - CMIPLUS_CLIENT_SECRET=${CMIPLUS_CLIENT_SECRET}
+      - PAYMENT_PROVIDER=${PAYMENT_PROVIDER}
+      - ALLSECURE_BASE_URL=${ALLSECURE_BASE_URL}
+      - ALLSECURE_API_KEY=${ALLSECURE_API_KEY}
+      - ALLSECURE_SHARED_SECRET=${ALLSECURE_SHARED_SECRET}
+      - ALLSECURE_USERNAME=${ALLSECURE_USERNAME}
+      - ALLSECURE_PASSWORD=${ALLSECURE_PASSWORD}
+      - ALLSECURE_INTEGRATION_KEY=${ALLSECURE_INTEGRATION_KEY}
+      - ALLSECURE_CURRENCY=${ALLSECURE_CURRENCY}
+      - ALLSECURE_PUBLIC_BASE_URL=${ALLSECURE_PUBLIC_BASE_URL}
+    restart: unless-stopped
+
+  notification-service:
+    ports: !reset []
+    expose:
+      - "8087"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - KAFKA_BROKER=kafka:9092
+      - JWT_SECRET=${JWT_SECRET}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - POSTGRES_PASSWORD_NOTIFICATION=${POSTGRES_PASSWORD_NOTIFICATION}
+      - FIREBASE_CREDENTIALS_PATH=/app/firebase/firebase-service-account.json
+      - NOTIFICATION_EMAIL_ENABLED=${NOTIFICATION_EMAIL_ENABLED:-false}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY}
+      - MAILGUN_DOMAIN=${MAILGUN_DOMAIN}
+      - MAILGUN_FROM_EMAIL=${MAILGUN_FROM_EMAIL}
+      - MAILGUN_BASE_URL=${MAILGUN_BASE_URL:-https://api.mailgun.net/v3}
+    restart: unless-stopped
+
+  admin-web:
+    build:
+      args:
+        VITE_API_BASE_URL: ${ADMIN_WEB_API_BASE_URL}
+    ports: !reset []
+    expose:
+      - "80"
+    restart: unless-stopped
+
+  marketing-web:
+    ports: !reset []
+    expose:
+      - "80"
+    restart: unless-stopped
+
+  reverse-proxy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - PUBLIC_DOMAIN=${PUBLIC_DOMAIN}
+      - ADMIN_PUBLIC_DOMAIN=${ADMIN_PUBLIC_DOMAIN:-}
+      - MARKETING_PUBLIC_DOMAIN=${MARKETING_PUBLIC_DOMAIN:-}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api-gateway
+      - admin-web
+      - marketing-web
+    networks:
+      - stillfresh_network
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

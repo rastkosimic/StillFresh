@@ -11,6 +11,7 @@ import com.stillfresh.app.paymentservice.service.PayoutAutoOrchestrator;
 import com.stillfresh.app.paymentservice.service.PayoutAutoControlService;
 import com.stillfresh.app.paymentservice.service.PayoutExecutionService;
 import com.stillfresh.app.paymentservice.service.PayoutSchedulerService;
+import com.stillfresh.app.sharedentities.security.InternalServiceHeaders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +22,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -349,7 +353,7 @@ public class LedgerController {
     }
 
     private boolean isAdminOrSelf(Long requestedVendorId) {
-        if (isAdmin()) return true;
+        if (isAdmin() || isInternalService()) return true;
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null) return false;
         // Check if caller is a vendor whose ID matches
@@ -357,15 +361,42 @@ public class LedgerController {
                 .map(GrantedAuthority::getAuthority)
                 .anyMatch(r -> r.equals("ROLE_VENDOR") || r.equals("ROLE_VENDOR_ADMIN"));
         if (!isVendorRole) return false;
-        try {
-            Object principal = auth.getPrincipal();
-            if (principal instanceof org.springframework.security.core.userdetails.UserDetails ud) {
-                // The vendor ID is stored as a custom attribute injected by GatewayTrustFilter
-                // We match by checking the name attribute if it holds the vendorId as string
-                String name = ud.getUsername();
-                return name != null && name.equals(String.valueOf(requestedVendorId));
+
+        // The vendor's ID comes from the gateway's X-User-Id header, which GatewayTrustFilter
+        // stores as the "userId" request attribute. The principal name is the vendor's
+        // username/email, so comparing it to a numeric vendor ID never matched and locked
+        // vendors out of their own ledger.
+        Long callerVendorId = callerVendorId();
+        return callerVendorId != null && callerVendorId.equals(requestedVendorId);
+    }
+
+    private boolean isInternalService() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return false;
+        return auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(InternalServiceHeaders.ROLE_INTERNAL_SERVICE::equals);
+    }
+
+    /** Reads the gateway-stamped user ID for the current request, or null if absent. */
+    private Long callerVendorId() {
+        RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
+        if (!(attributes instanceof ServletRequestAttributes servletAttributes)) {
+            return null;
+        }
+        // GatewayTrustFilter stores a Long on the gateway path and a String on the
+        // service-to-service JWT fallback path.
+        Object userId = servletAttributes.getRequest().getAttribute("userId");
+        if (userId instanceof Long id) {
+            return id;
+        }
+        if (userId != null) {
+            try {
+                return Long.parseLong(userId.toString());
+            } catch (NumberFormatException e) {
+                return null;
             }
-        } catch (Exception ignored) {}
-        return false;
+        }
+        return null;
     }
 }

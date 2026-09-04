@@ -293,10 +293,13 @@ public class UserService {
         if (principal instanceof CustomUserDetails) {
             return ((CustomUserDetails) principal).getUser();
         }
-        // Fallback: extract JWT from details (e.g. when not behind gateway)
+        // Fallback: extract JWT from details (e.g. when not behind gateway).
+        // Read straight from the repository rather than the Redis-backed findByEmail cache:
+        // the password is WRITE_ONLY, so a cached copy deserializes without it, and callers of
+        // this method persist the entity and publish it to authorization-service.
         String jwt = extractTokenFromContext();
         String email = jwtUtil.extractEmail(jwt);
-        return findByEmail(email)
+        return userRepository.findByEmail(email)
             .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
@@ -553,9 +556,19 @@ public class UserService {
             return existingUser;
         }
 
-        logger.info("Creating OAuth2 user with global ID: {}, email: {}, username: {}", 
-            user.getId(), user.getEmail(), user.getUsername());
-        
+        // Never take role or status from the request. This endpoint creates ordinary customer
+        // accounts during Google sign-in; honouring a caller-supplied role would let it mint an
+        // ADMIN or SUPER_ADMIN account.
+        user.setRole(Role.USER);
+        user.setStatus(Status.ACTIVE);
+
+        // OAuth2 users authenticate through Google and have no usable password. Store a hash of
+        // an unguessable value rather than a caller-supplied plaintext, so the column can never
+        // hold something that would satisfy a password login.
+        user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+
+        logger.info("Creating OAuth2 user with global ID: {}", user.getId());
+
         User savedUser = userRepository.save(user);
         
         logger.info("Successfully created OAuth2 user in user-service with ID: {}", savedUser.getId());

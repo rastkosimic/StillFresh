@@ -3,6 +3,7 @@ package com.stillfresh.app.userservice.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.stillfresh.app.sharedentities.security.InternalServiceHeaders;
 
 import feign.RequestInterceptor;
 import feign.codec.Encoder;
@@ -11,6 +12,7 @@ import feign.jackson.JacksonDecoder;
 import feign.jackson.JacksonEncoder;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -18,6 +20,10 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Configuration
 public class AuthorizationServiceFeignConfig {
+
+    @Value("${internal.service.secret}")
+    private String internalServiceSecret;
+
     @Bean
     public ObjectMapper objectMapper() {
         ObjectMapper objectMapper = new ObjectMapper();
@@ -44,7 +50,11 @@ public class AuthorizationServiceFeignConfig {
             // Only add Authorization header for endpoints that require it
             String url = requestTemplate.url();
             if (url.contains("/api/auth/") && !url.contains("/check-availability")) {
-                // For protected endpoints, try to get the Authorization header
+                // These endpoints run during registration, before any user is authenticated, so
+                // the shared internal secret — not a forwarded JWT — is what authorizes them.
+                requestTemplate.header(InternalServiceHeaders.INTERNAL_SECRET, internalServiceSecret);
+
+                // Still forward the caller's token when one exists, for audit context.
                 ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
                 if (attributes != null) {
                     HttpServletRequest request = attributes.getRequest();

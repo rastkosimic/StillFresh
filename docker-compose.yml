@@ -304,6 +304,7 @@ services:
       - KAFKA_BROKER=kafka:9092
       - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
       - POSTGRES_PASSWORD_ORDERS=${POSTGRES_PASSWORD_ORDERS}
+      - PAYMENT_PROVIDER=${PAYMENT_PROVIDER:-stripe}
     logging:
       driver: "json-file"
       options:

@@ -7,6 +7,8 @@ import com.stillfresh.app.paymentservice.dto.PaymentRequest;
 import com.stillfresh.app.paymentservice.dto.PaymentResponse;
 import com.stillfresh.app.paymentservice.exception.PaymentMethodException;
 import com.stillfresh.app.paymentservice.provider.PaymentProviderRouter;
+import com.stillfresh.app.paymentservice.repository.PaymentTransactionRepository;
+import com.stillfresh.app.paymentservice.security.CallerContext;
 import com.stillfresh.app.paymentservice.service.PaymentService;
 import com.stripe.exception.StripeException;
 import com.stripe.model.PaymentIntent;
@@ -42,6 +44,12 @@ public class PaymentController {
     @Autowired
     private PaymentProviderRouter paymentProviderRouter;
 
+    @Autowired
+    private PaymentTransactionRepository paymentTransactionRepository;
+
+    @Autowired
+    private CallerContext callerContext;
+
     private static boolean isVendorOrAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null) return false;
@@ -49,6 +57,34 @@ public class PaymentController {
                 .map(GrantedAuthority::getAuthority)
                 .anyMatch(r -> r.equals("ROLE_VENDOR") || r.equals("ROLE_VENDOR_ADMIN")
                             || r.equals("ROLE_ADMIN")  || r.equals("ROLE_SUPER_ADMIN"));
+    }
+
+    /**
+     * Checks that the caller is entitled to act on the given authorization reference.
+     *
+     * <p>The role check above only established that the caller is <em>some</em> vendor. Without
+     * this, any vendor could capture or void the authorization belonging to another vendor's
+     * order — taking a customer's money or releasing a competitor's hold.
+     *
+     * <p>Both providers persist a {@code PaymentTransaction} keyed by the reference (Stripe
+     * PaymentIntent ID or AllSecure preauth UUID), so the same lookup covers both. An unknown
+     * reference is refused for vendors rather than passed through to the provider.
+     */
+    private boolean callerOwnsPayment(String paymentReference) {
+        if (callerContext.isAdmin()) {
+            return true;
+        }
+        Long callerVendorId = callerContext.vendorId();
+        if (callerVendorId == null) {
+            return false;
+        }
+        return paymentTransactionRepository.findByPaymentIntentId(paymentReference)
+                .map(tx -> callerVendorId.equals(tx.getVendorId()))
+                .orElseGet(() -> {
+                    logger.warn("Rejected action on unknown payment reference {} by vendorId {}",
+                            paymentReference, callerVendorId);
+                    return false;
+                });
     }
     
     //Register a Card
@@ -204,6 +240,10 @@ public class PaymentController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("success", false, "message", "Only vendors and admins can capture payments"));
         }
+        if (!callerOwnsPayment(paymentIntentId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("success", false, "message", "You can only capture payments for your own orders"));
+        }
         try {
             paymentProviderRouter.active().capture(paymentIntentId);
             return ResponseEntity.ok(Map.of(
@@ -238,6 +278,10 @@ public class PaymentController {
         if (!isVendorOrAdmin()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("success", false, "message", "Only vendors and admins can cancel payments"));
+        }
+        if (!callerOwnsPayment(paymentIntentId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("success", false, "message", "You can only cancel payments for your own orders"));
         }
         try {
             PaymentIntent cancelledIntent = paymentService.cancelPaymentIntent(paymentIntentId);

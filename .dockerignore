@@ -1,0 +1,23 @@
+# Prevent sensitive local files from being sent as Docker build context.
+.env
+.env.*
+!.env.example
+!.env.prod.example
+init-*.sql
+hs_err_pid*.log
+replay_pid*.log
+firebase-credentials.json
+firebase-credentials.json/
+**/*firebase*service-account*.json
+**/*-adminsdk-*.json
+*.p12
+*.jks
+*.pem
+*.key
+.git
+.cursor
+.claude
+**/target
+**/node_modules
+**/.idea
+**/.settings

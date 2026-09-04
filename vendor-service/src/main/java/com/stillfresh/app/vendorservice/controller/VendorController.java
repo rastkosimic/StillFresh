@@ -9,9 +9,11 @@ import com.stillfresh.app.vendorservice.dto.DeleteVendorAccountRequest;
 import com.stillfresh.app.vendorservice.dto.PasswordChangeRequest;
 import com.stillfresh.app.vendorservice.dto.PendingVendorRegistrationRequest;
 import com.stillfresh.app.vendorservice.dto.VendorCredentialsResponse;
+import com.stillfresh.app.vendorservice.dto.VendorProfileUpdateRequest;
 import com.stillfresh.app.vendorservice.dto.VendorTypeRequest;
 import com.stillfresh.app.vendorservice.dto.HeadquartersRequest;
 import com.stillfresh.app.vendorservice.dto.BankingModelRequest;
+import com.stillfresh.app.vendorservice.dto.ChainLocationStatsResponse;
 import com.stillfresh.app.vendorservice.dto.LocationRequest;
 import com.stillfresh.app.vendorservice.dto.SwitchBankingModelRequest;
 import com.stillfresh.app.vendorservice.dto.WorkerRequest;
@@ -295,17 +297,12 @@ public class VendorController {
         summary = "Get vendor info for login (internal)",
         description = "Internal endpoint for authorization-service to fetch vendor info during login. Returns simplified vendor info."
     )
+    // Authorization is enforced by InternalServiceFilter and WebSecurityConfig, which require
+    // the shared internal secret for /vendors/internal/**. The previous check here only tested
+    // that an X-Internal-Service header was non-empty, which any caller could satisfy.
     @GetMapping("/internal/{id}/login-info")
     public ResponseEntity<Map<String, Object>> getVendorLoginInfo(
-        @Parameter(description = "Vendor ID") @PathVariable Long id,
-        @RequestHeader(value = "X-Internal-Service", required = false) String internalService) {
-        
-        // Verify this is an internal service call
-        if (internalService == null || internalService.isEmpty()) {
-            logger.warn("Unauthorized internal service call attempt to /vendors/internal/{}/login-info", id);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-        
+        @Parameter(description = "Vendor ID") @PathVariable Long id) {
         try {
             Vendor vendor = vendorService.findVendorById(id);
             
@@ -334,7 +331,7 @@ public class VendorController {
     @PreAuthorize("hasRole('VENDOR_ADMIN')")
     @PutMapping("/update-profile")
     public ResponseEntity<String> updateVendorProfile(
-        @Valid @RequestBody Vendor updatedVendor,
+        @Valid @RequestBody VendorProfileUpdateRequest updatedVendor,
         BindingResult result) {
   
         if (result.hasErrors()) {
@@ -1539,6 +1536,47 @@ public class VendorController {
             logger.error("Error getting chain locations: {}", ex.getMessage(), ex);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(null);
+        }
+    }
+
+    @Operation(
+        summary = "Get chain restaurant stats",
+        description = "Returns sales statistics for all selling locations in the chain, plus rolled-up chain totals. "
+            + "HQ VENDOR_ADMIN only (branch admins use per-location /vendors/stats). SUPER_ADMIN must pass chainId."
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasAnyRole('VENDOR_ADMIN', 'SUPER_ADMIN')")
+    @GetMapping("/chain/stats")
+    public ResponseEntity<?> getChainLocationStats(
+            @RequestParam(value = "from", required = false) String from,
+            @RequestParam(value = "to", required = false) String to,
+            @RequestParam(value = "chainId", required = false) String chainId) {
+        try {
+            java.time.OffsetDateTime fromDt = (from == null || from.isBlank()) ? null : java.time.OffsetDateTime.parse(from);
+            java.time.OffsetDateTime toDt = (to == null || to.isBlank()) ? null : java.time.OffsetDateTime.parse(to);
+            ChainLocationStatsResponse stats = vendorService.getChainLocationStats(fromDt, toDt, chainId);
+            return ResponseEntity.ok(stats);
+        } catch (java.time.format.DateTimeParseException ex) {
+            logger.warn("Invalid date-time format for chain stats query. from='{}', to='{}'", from, to);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ErrorResponse("Invalid date-time format"));
+        } catch (IllegalArgumentException e) {
+            logger.warn("Chain stats request rejected: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ErrorResponse(e.getMessage()));
+        } catch (RuntimeException e) {
+            if (e.getMessage() != null && e.getMessage().contains("Only headquarters")) {
+                logger.warn("Chain stats forbidden: {}", e.getMessage());
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(new ErrorResponse(e.getMessage()));
+            }
+            logger.warn("Failed to get chain stats: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ErrorResponse(e.getMessage()));
+        } catch (Exception ex) {
+            logger.error("Error getting chain stats: {}", ex.getMessage(), ex);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("Failed to get chain stats: " + ex.getMessage()));
         }
     }
     

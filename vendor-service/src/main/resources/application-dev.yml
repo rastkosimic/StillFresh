@@ -1,0 +1,28 @@
+# Local development profile (docker-compose on a workstation).
+# Reproduces the behaviour the stack had before profiles were introduced.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+app:
+  base-url: ${APP_BASE_URL:http://localhost:8080}
+
+vendor:
+  login-url: ${VENDOR_LOGIN_URL:http://localhost:8080/auth/login}
+
+jwt:
+  secret: ${JWT_SECRET:}
+
+gateway:
+  internal:
+    secret: ${GATEWAY_INTERNAL_SECRET:stillfresh-gw-dev-secret-change-in-prod}
+
+logging:
+  level:
+    root: INFO
+
+internal:
+  service:
+    secret: ${INTERNAL_SERVICE_SECRET:stillfresh-internal-dev-secret-change-in-prod}

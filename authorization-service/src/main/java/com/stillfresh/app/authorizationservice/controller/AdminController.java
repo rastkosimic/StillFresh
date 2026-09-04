@@ -2,9 +2,13 @@ package com.stillfresh.app.authorizationservice.controller;
 
 import com.stillfresh.app.authorizationservice.model.User;
 import com.stillfresh.app.authorizationservice.service.UserService;
+import com.stillfresh.app.sharedentities.security.SharedSecret;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,13 +21,41 @@ import java.util.List;
 @Tag(name = "Admin Management", description = "Operations related to administration")
 public class AdminController {
 
+    private static final Logger logger = LoggerFactory.getLogger(AdminController.class);
+
+    private static final String BOOTSTRAP_TOKEN_HEADER = "X-Admin-Bootstrap-Token";
+
     @Autowired
     private UserService userService;
-    
+
+    /**
+     * One-time bootstrap token. Empty (the default) disables the endpoint entirely, so an
+     * operator has to deliberately enable admin creation and can turn it off again afterwards.
+     */
+    @Value("${admin.bootstrap.token:}")
+    private String bootstrapToken;
+
     // Method to create a Super-Admin
-    @Operation(summary = "Create Initial Super-Admin", description = "Create the initial super-admin. Can only be used if no Super-Admin exists.")
+    @Operation(summary = "Create Initial Super-Admin", description = "Create the initial super-admin. "
+            + "Requires the X-Admin-Bootstrap-Token header and only works while no Super-Admin exists.")
     @PostMapping("/create-initial-admin")
-    public ResponseEntity<String> createInitialAdmin(@RequestBody User admin) {
+    public ResponseEntity<String> createInitialAdmin(
+            @RequestHeader(value = BOOTSTRAP_TOKEN_HEADER, required = false) String providedToken,
+            @RequestBody User admin) {
+        // This endpoint is unauthenticated by necessity — it runs before any admin exists — so
+        // the bootstrap token is the only thing standing between a fresh deployment and an
+        // attacker claiming the SUPER_ADMIN account.
+        if (bootstrapToken == null || bootstrapToken.isBlank()) {
+            logger.warn("Rejected create-initial-admin: admin.bootstrap.token is not configured");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body("Admin bootstrap is disabled.");
+        }
+        if (!SharedSecret.matches(bootstrapToken, providedToken)) {
+            logger.warn("Rejected create-initial-admin: invalid or missing bootstrap token");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body("Admin bootstrap is disabled.");
+        }
+
         // Check if a Super-Admin already exists
         if (userService.hasSuperAdmin()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)

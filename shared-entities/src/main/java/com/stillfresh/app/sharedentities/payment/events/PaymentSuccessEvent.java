@@ -6,6 +6,9 @@ public class PaymentSuccessEvent {
     private Long offerId;
     private String paymentIntentId;  // Stripe PaymentIntent ID for manual capture/cancel
 
+    /** Active provider that authorized the payment: {@code stripe} or {@code allsecure}. */
+    private String paymentProvider;
+
     public PaymentSuccessEvent() {}
 
     public PaymentSuccessEvent(String requestId, Long userId, Long offerId) {
@@ -51,6 +54,14 @@ public class PaymentSuccessEvent {
 
     public void setPaymentIntentId(String paymentIntentId) {
         this.paymentIntentId = paymentIntentId;
+    }
+
+    public String getPaymentProvider() {
+        return paymentProvider;
+    }
+
+    public void setPaymentProvider(String paymentProvider) {
+        this.paymentProvider = paymentProvider;
     }
 
     @Override

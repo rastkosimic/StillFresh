@@ -8,6 +8,7 @@ import com.stillfresh.app.paymentservice.dto.PaymentResponse;
 import com.stillfresh.app.paymentservice.model.PaymentTransaction;
 import com.stillfresh.app.paymentservice.model.PaymentUser;
 import com.stillfresh.app.paymentservice.publisher.PaymentEventPublisher;
+import com.stillfresh.app.paymentservice.provider.StripePaymentProvider;
 import com.stillfresh.app.paymentservice.repository.PaymentTransactionRepository;
 import com.stillfresh.app.paymentservice.service.LedgerService;
 import com.stillfresh.app.sharedentities.payment.events.OrderPaymentSettledEvent;
@@ -452,9 +453,10 @@ public class PaymentService {
             }
 
             // 🔹 Publish Payment Success Event with PaymentIntent ID
-            eventPublisher.publishPaymentSuccessEvent(new PaymentSuccessEvent(
-                event.getRequestId(), event.getUserId(), event.getOfferId(), paymentIntent.getId()
-            ));
+            PaymentSuccessEvent successEvent = new PaymentSuccessEvent(
+                event.getRequestId(), event.getUserId(), event.getOfferId(), paymentIntent.getId());
+            successEvent.setPaymentProvider(StripePaymentProvider.NAME);
+            eventPublisher.publishPaymentSuccessEvent(successEvent);
 
         } catch (StripeException e) {
             logger.error("Payment failed for requestId: {}, reason: {}", event.getRequestId(), e.getMessage());
@@ -566,6 +568,38 @@ public class PaymentService {
     /** Public entry-point used by PayoutSchedulerService to fetch vendor IBAN at scheduling time. */
     public VendorPaymentInfoResponseEvent getVendorPaymentInfo(Long vendorId) throws Exception {
         return requestVendorPaymentInfo(vendorId);
+    }
+
+    /**
+     * Returns the Stripe Connect account ID belonging to a vendor, using the same short-lived
+     * cache as the charge path so authorization checks do not pay a Kafka round-trip per request.
+     *
+     * @return the account ID, or {@code null} if unknown or the lookup failed
+     */
+    public String getVendorStripeAccountId(Long vendorId) {
+        if (vendorId == null) {
+            return null;
+        }
+        CachedVendorInfo cached = vendorPaymentInfoCache.get(vendorId);
+        if (cached != null && cached.expiresAt > System.currentTimeMillis()) {
+            return cached.stripeAccountId;
+        }
+        if (cached != null) {
+            vendorPaymentInfoCache.remove(vendorId);
+        }
+        try {
+            VendorPaymentInfoResponseEvent info = requestVendorPaymentInfo(vendorId);
+            if (info == null || !info.isSuccess()) {
+                return null;
+            }
+            vendorPaymentInfoCache.put(vendorId, new CachedVendorInfo(
+                    info.getStripeAccountId(), info.getPayoutModel(),
+                    System.currentTimeMillis() + VENDOR_INFO_CACHE_TTL_MS));
+            return info.getStripeAccountId();
+        } catch (Exception e) {
+            logger.warn("Could not resolve Stripe account for vendor {}: {}", vendorId, e.getMessage());
+            return null;
+        }
     }
 
     private VendorPaymentInfoResponseEvent requestVendorPaymentInfo(Long vendorId) throws Exception {
